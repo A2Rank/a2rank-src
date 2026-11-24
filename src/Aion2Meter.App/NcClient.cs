@@ -14,12 +14,34 @@ internal sealed record NcLoaded(int Server, string Name, NcProfile? Profile, IRe
 /// <summary>
 /// Asks the official character search (aion2.plaync.com) for a character, only when the user clicks a name, and as little as possible:
 /// first one search, the profile and the equipment list (3 small requests); the stones and the engraving of each weapon/armor/accessory (about 19 requests,
-/// three at a time, with a pause between them) only when the user asks for them. Nothing is kept: the next look asks again. The site's "too many requests"
-/// or any error stops it (what was read is shown). The requests carry the name of this program.
+/// three at a time, with a pause between them) only when the user asks for them. The site's "too many requests"
+/// or any error stops it (what was read is shown). The requests carry the name of this program. What was read is kept in memory for ten minutes (never on disk): the next look at the same one in that time asks nothing.
 /// </summary>
 internal static class NcClient
 {
     private static readonly HttpClient Http = Create();
+
+    // What was read of a character is kept in memory only, for ten minutes (the hotkey for the one I aim at must not ask the site again and again); nothing is written to disk.
+    private static readonly Dictionary<(int Server, string Name), (DateTimeOffset At, NcLoaded Data)> Cache = [];
+    private static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(10);
+    private const int MaxCached = 40;
+
+    /// <summary>What was read of this character less than ten minutes ago, or null.</summary>
+    public static NcLoaded? Cached(string name, int server)
+    {
+        lock (Cache) return Cache.TryGetValue((server, name), out var c) && DateTimeOffset.UtcNow - c.At < CacheFor ? c.Data : null;
+    }
+
+    /// <summary>Keeps what was read (a character that was found), the fuller one after the stones and engraving were read.</summary>
+    public static void Remember(NcLoaded data)
+    {
+        if (!data.Found) return;
+        lock (Cache)
+        {
+            if (Cache.Count >= MaxCached) Cache.Remove(Cache.MinBy(x => x.Value.At).Key);
+            Cache[(data.Server, data.Name)] = (DateTimeOffset.UtcNow, data);
+        }
+    }
 
     private static HttpClient Create()
     {

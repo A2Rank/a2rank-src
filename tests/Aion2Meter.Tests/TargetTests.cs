@@ -108,4 +108,27 @@ public class AimedEntityTests
         w.Observe(new TargetMessage(0, false), T0.AddSeconds(8));        // cleared
         Assert.Equal(0u, w.Aimed);
     }
+
+    [Fact]
+    public void The_player_I_aim_at_is_found_by_name_and_server_and_a_monster_never_is()
+    {
+        var w = new TargetWatcher();
+        Assert.Null(w.AimedPlayer);
+        w.Observe(new IdentityMessage(5421, "적", 60, 2, 2004, RawId: 10925, ClassCode: 17), T0);
+        w.Observe(new TargetMessage(10925, true), T0.AddSeconds(1));
+        Assert.Equal(("적", 2004), w.AimedPlayer);
+        // a monster that was seen appearing and has the same number as the raw number of a player: it is the monster
+        w.Observe(new IdentityMessage(15000, "다른적", 60, 2, 2005, RawId: 30000, ClassCode: 18), T0.AddSeconds(2));
+        w.Observe(new TargetMessage(30000, true), T0.AddSeconds(3));
+        Assert.Equal(("다른적", 2005), w.AimedPlayer);
+        w.Observe(new SpawnMessage(30000, "", 0x2C8EFE), T0.AddSeconds(4));          // the same number, seen appearing as a monster
+        Assert.Null(w.AimedPlayer);
+        // someone whose identity was not seen, and the server not known: nothing to look up
+        var other = new TargetWatcher();
+        other.Observe(new TargetMessage(777, true), T0);
+        Assert.Null(other.AimedPlayer);
+        other.Observe(new IdentityMessage(9, "서버모름", 60, 1, 0, RawId: 800), T0.AddSeconds(1));
+        other.Observe(new TargetMessage(800, true), T0.AddSeconds(2));
+        Assert.Null(other.AimedPlayer);
+    }
 }

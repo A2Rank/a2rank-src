@@ -29,20 +29,51 @@ public partial class CharacterInfoWindow : Window
 
     public CharacterInfoWindow() => InitializeComponent();
 
-    /// <summary>Opens (or reuses) the window for this character.</summary>
-    public static void Show(string name, int server, Window? owner)
+    /// <summary>Where the window was last (null: never), where it opens by default, and what to do with a place it was moved or sized to (the controller keeps it in the settings).</summary>
+    public static Func<Rect?>? LoadPlace { get; set; }
+    public static Func<Rect>? DefaultPlace { get; set; }
+    public static Action<Rect, bool>? SavePlace { get; set; }
+
+    /// <summary>Opens (or reuses) the window for this character; <paramref name="activate"/> false: it does not take the keyboard from the game (the hotkey).</summary>
+    public static void Show(string name, int server, Window? owner, bool activate = true)
     {
         if (_open is not { IsLoaded: true })
         {
-            _open = new CharacterInfoWindow();
-            _open.Closed += (_, _) => _open = null;
-            ((Window)_open).Show();
+            var window = new CharacterInfoWindow { ShowActivated = activate, Topmost = WindowPrefs.AlwaysOnTop, WindowStartupLocation = WindowStartupLocation.Manual };
+            window.Place(LoadPlace?.Invoke() ?? DefaultPlace?.Invoke());
+            window.LocationChanged += (_, _) => window.Remember(false);
+            window.SizeChanged += (_, _) => window.Remember(false);
+            window.Closing += (_, _) => window.Remember(true);
+            window.Closed += (_, _) => _open = null;
+            _open = window;
+            window.Show();
         }
-        _open.Activate();
-        _ = _open.Load(name, server);
+        if (activate) _open.Activate();
+        _ = _open.Load(name, server, force: false);
     }
 
-    private async Task Load(string name, int server)
+    /// <summary>The window shows this character now.</summary>
+    public static bool IsShowing(string name, int server) => _open is { IsLoaded: true } w && w._name == name && w._server == server;
+
+    public static void CloseOpen() => _open?.Close();
+
+    /// <summary>The window as a normal one: its place and size, kept inside the screens (a monitor may be gone since).</summary>
+    private void Place(Rect? place)
+    {
+        if (place is not { } r) return;
+        double vl = SystemParameters.VirtualScreenLeft, vt = SystemParameters.VirtualScreenTop, vw = SystemParameters.VirtualScreenWidth, vh = SystemParameters.VirtualScreenHeight;
+        double width = Math.Clamp(r.Width, MinWidth, Math.Max(MinWidth, vw)), height = Math.Clamp(r.Height, MinHeight, Math.Max(MinHeight, vh));
+        (Width, Height) = (width, height);
+        Left = Math.Clamp(r.Left, vl, Math.Max(vl, vl + vw - width));
+        Top = Math.Clamp(r.Top, vt, Math.Max(vt, vt + vh - Math.Min(height, 80)));
+    }
+
+    private void Remember(bool flush)
+    {
+        if (WindowState == WindowState.Normal && IsLoaded) SavePlace?.Invoke(new Rect(Left, Top, Width, Height), flush);
+    }
+
+    private async Task Load(string name, int server, bool force)
     {
         _cancel?.Cancel();
         var cancel = _cancel = new CancellationTokenSource();
@@ -52,6 +83,13 @@ public partial class CharacterInfoWindow : Window
         _busy = true;
         DetailsButton.IsEnabled = RefreshButton.IsEnabled = BrowserButton.IsEnabled = false;
         Body.Children.Clear();
+        if (!force && NcClient.Cached(name, server) is { } kept)
+        {
+            _data = kept;
+            _busy = false;
+            Render(kept);   // read a moment ago: nothing is asked again (the refresh button asks anyway)
+            return;
+        }
         StatusText.Text = $"{name} [{Servers.Label(server)}]: 공식 캐릭터 정보실에서 찾는 중…";
         try
         {
@@ -59,6 +97,7 @@ public partial class CharacterInfoWindow : Window
             if (cancel.IsCancellationRequested) return;
             _data = result;
             _busy = false;
+            NcClient.Remember(result);
             Render(result);
         }
         catch (OperationCanceledException) { }
@@ -78,6 +117,7 @@ public partial class CharacterInfoWindow : Window
             if (cancel.IsCancellationRequested) return;
             _data = result;
             _busy = false;
+            NcClient.Remember(result);   // the fuller one replaces the basic one in memory
             Render(result);
         }
         catch (OperationCanceledException) { }
@@ -267,7 +307,7 @@ public partial class CharacterInfoWindow : Window
         "Brooch1" or "Brooch2" => "브로치", "Pendant" => "펜던트", _ => slot,
     };
 
-    private void OnRefresh(object sender, RoutedEventArgs e) => _ = Load(_name, _server);
+    private void OnRefresh(object sender, RoutedEventArgs e) => _ = Load(_name, _server, force: true);
 
     private void OnOpenInBrowser(object sender, RoutedEventArgs e)
     {

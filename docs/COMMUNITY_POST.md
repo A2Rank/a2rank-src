@@ -1,6 +1,6 @@
 # 커뮤니티 게시글 초안과 운영자에게 보낼 글
 
-> 아래 해시와 VirusTotal 링크는 0.2.26 설치 파일 기준입니다. **VirusTotal에 0.2.26 설치 파일을 올려서 결과가 나온 뒤에 글을 올리세요** (0.2.24는 악성 표시 0개였음). 해시와 링크는 새 버전을 낼 때마다 바뀌니, 글을 올리는 시점의 최신 설치 파일로 다시 검사해서 바꿔 주세요. 게시판 말투는 규칙에 맞게 고치세요.
+> 아래 해시와 VirusTotal 링크는 0.2.27 설치 파일 기준입니다. **VirusTotal에 0.2.27 설치 파일을 올려서 결과가 나온 뒤에 글을 올리세요** (0.2.24는 악성 표시 0개였음). 해시와 링크는 새 버전을 낼 때마다 바뀌니, 글을 올리는 시점의 최신 설치 파일로 다시 검사해서 바꿔 주세요. 게시판 말투는 규칙에 맞게 고치세요.
 
 ---
 
@@ -29,8 +29,8 @@
 - 업데이트는 개발자 키로 서명한 목록만 설치합니다. 설정에서 자동 업데이트를 끌 수 있습니다.
 
 ### 직접 확인해 보실 수 있습니다
-- **VirusTotal 검사 결과 (악성 표시 0개):** https://www.virustotal.com/gui/file/ce18529237f4699fc72b61e3b53e415f33b415bf00dafea8f59ee2156029ea8f
-- **설치 파일 SHA-256 (0.2.26):** `ce18529237f4699fc72b61e3b53e415f33b415bf00dafea8f59ee2156029ea8f` (받은 파일의 해시와 같은지 `certutil -hashfile 파일명 SHA256`로 비교)
+- **VirusTotal 검사 결과 (악성 표시 0개):** https://www.virustotal.com/gui/file/1d1aee438ff4708d273ca2f9f17d311b607ff3cc9dbef9596239b7432423b220
+- **설치 파일 SHA-256 (0.2.27):** `1d1aee438ff4708d273ca2f9f17d311b607ff3cc9dbef9596239b7432423b220` (받은 파일의 해시와 같은지 `certutil -hashfile 파일명 SHA256`로 비교)
 - **Windows 샌드박스나 가상머신**에서 먼저 돌려 보셔도 됩니다. Process Monitor로 보면 파일은 `%LOCALAPPDATA%\A2Rank`와 `%LOCALAPPDATA%\A2RankData`에만 쓰고, 연결은 위의 `github.com`뿐입니다 (동의한 뒤의 서버 전송 제외).
 - 개인정보 처리방침, 이용 안내, 사용한 오픈소스 목록: https://github.com/A2Rank/releases
 
@@ -53,7 +53,7 @@
 혹시 악성코드가 걱정되실까 봐 아래에 정리했습니다.
 - 게임 파일·메모리·프로세스를 건드리지 않고, 키 입력을 대신하거나 매크로를 돌리지도 않습니다. 게임 서버와 주고받는 네트워크 패킷을 **내 PC에서 읽기만** 합니다 (Npcap 사용).
 - 인터넷 연결은 업데이트 확인용 GitHub 한 곳이 전부이고, 서버로 보내는 기능은 사용자가 동의하거나 직접 누를 때만 동작합니다. 개인정보 처리방침과 이용 안내를 공개해 두었습니다 (https://github.com/A2Rank/releases).
-- VirusTotal 검사 결과: https://www.virustotal.com/gui/file/ce18529237f4699fc72b61e3b53e415f33b415bf00dafea8f59ee2156029ea8f / 설치 파일 SHA-256: `ce18529237f4699fc72b61e3b53e415f33b415bf00dafea8f59ee2156029ea8f`
+- VirusTotal 검사 결과: https://www.virustotal.com/gui/file/1d1aee438ff4708d273ca2f9f17d311b607ff3cc9dbef9596239b7432423b220 / 설치 파일 SHA-256: `1d1aee438ff4708d273ca2f9f17d311b607ff3cc9dbef9596239b7432423b220`
 - 믿기 어려우시면 **Windows 샌드박스나 가상머신에서 먼저 돌려 보셔도 됩니다.** 접속하는 곳과 쓰는 폴더를 직접 확인하실 수 있게 목록을 드리겠습니다.
 - 소스 코드를 공개해 두었고 (https://github.com/A2Rank/a2rank-src), 난독화는 하지 않았습니다. 코드 서명 인증서는 아직 없습니다 (설치 때 SmartScreen 안내가 뜹니다). 이 점은 솔직히 말씀드립니다.
 

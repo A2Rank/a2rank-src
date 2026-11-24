@@ -22,6 +22,8 @@ public sealed class TargetWatcher
     private uint _current;
 
     private readonly Dictionary<ushort, uint> _entityOf = [];
+    private readonly Dictionary<ushort, (string Name, int Server)> _whoOf = [];
+    private readonly HashSet<uint> _monsters = [];
 
     /// <summary>
     /// The entity number of what I aim at now (0: none), the number the damage and effect messages use; read from another thread than the packet thread.
@@ -35,6 +37,22 @@ public sealed class TargetWatcher
         }
     }
     private uint _awaiting;   // the target whose class was unknown: an identity message for it may still come
+
+    /// <summary>
+    /// Name and server of the player I aim at now; null when I aim at nothing, at a monster (one that was seen appearing: a monster has no identity and its number could be the raw number of a player),
+    /// or at someone whose identity or server was not seen.
+    /// </summary>
+    public (string Name, int Server)? AimedPlayer
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_current == 0 || _current > ushort.MaxValue || _monsters.Contains(_current)) return null;
+                return _whoOf.TryGetValue((ushort)_current, out var who) && who.Name.Length > 0 && Servers.IsValid(who.Server) ? who : null;
+            }
+        }
+    }
 
     /// <summary>For the log: identity messages seen, the biggest entity number among them, targets that counted.</summary>
     public int Identities { get; private set; }
@@ -53,6 +71,8 @@ public sealed class TargetWatcher
                     _known[m.RawId] = new TargetedPlayer(m.ClassCode, m.Name);
                     if (_entityOf.Count >= MaxKnown) _entityOf.Clear();
                     _entityOf[m.RawId] = m.Entity;
+                    if (_whoOf.Count >= MaxKnown) _whoOf.Clear();
+                    _whoOf[m.RawId] = (m.Name, m.Server);
                     if (m.RawId > MaxSeen) MaxSeen = m.RawId;
                     Identities++;
                     if (_awaiting == m.RawId && m.ClassCode != 0) { _awaiting = 0; return _known[m.RawId] with { Id = m.RawId }; }   // the one I aim at was not known yet: tell now
@@ -62,6 +82,13 @@ public sealed class TargetWatcher
                 return Learn(d.Source, d.SkillKey);
             case PeriodicMessage p:
                 return Learn(p.Source, p.SkillKey);
+            case SpawnMessage { Entity: var spawned } when !Entities.IsPlayer(spawned):
+                lock (_lock)
+                {
+                    if (_monsters.Count >= MaxKnown) _monsters.Clear();
+                    _monsters.Add(spawned);
+                }
+                return null;
             case TargetMessage m:
                 lock (_lock)
                 {

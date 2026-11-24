@@ -38,6 +38,11 @@ public sealed class AppSettings
     public bool ShowKillList { get; set; } = true;
     /// <summary>The overlay, the kill list, the live fight window and the detail windows stay above all other windows (off: they are ordinary windows that other windows, also the game, can cover).</summary>
     public bool AlwaysOnTop { get; set; } = true;
+    /// <summary>Where the character info window was last (it opens there again; null: not yet).</summary>
+    public double? CharInfoLeft { get; set; }
+    public double? CharInfoTop { get; set; }
+    public double? CharInfoWidth { get; set; }
+    public double? CharInfoHeight { get; set; }
     public bool Hotkeys { get; set; } = true;
     /// <summary>Shortcut per action name ("Ctrl+Alt+P"); "" turns one off. Missing actions use their default.</summary>
     public Dictionary<string, string> HotkeyBindings { get; set; } = [];

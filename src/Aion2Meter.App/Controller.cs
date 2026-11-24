@@ -122,6 +122,7 @@ public sealed class Controller : IDisposable
         _live.ShowSort((LiveSort)Math.Clamp(Settings.LiveSort, 0, 2));
         WindowPrefs.AlwaysOnTop = Settings.AlwaysOnTop;
         ApplyPanelOpacity();
+        HookCharacterInfoPlace();
         _overlay.Show();
         ApplyTopmost();
         UpdateKillListVisibility();
@@ -558,6 +559,50 @@ public sealed class Controller : IDisposable
         SettingsChanged();
     }
 
+    private DateTimeOffset _lastAimedInfo;
+
+    /// <summary>
+    /// The hotkey: the character info of the player I aim at (the official search, a few small requests; what was read lately is shown again at once), or closes it when it already shows that one.
+    /// It does not take the keyboard from the game, and asks the site at most every 3 seconds.
+    /// </summary>
+    private void ToggleAimedInfo()
+    {
+        if (_targets.AimedPlayer is not { } who)
+        {
+            _overlay.ShowBossBanner("플레이어를 조준한 뒤에 눌러 주세요 (몬스터이거나 상대의 이름을 아직 모릅니다)");
+            return;
+        }
+        if (CharacterInfoWindow.IsShowing(who.Name, who.Server))
+        {
+            CharacterInfoWindow.CloseOpen();
+            return;
+        }
+        var now = DateTimeOffset.UtcNow;
+        if (NcClient.Cached(who.Name, who.Server) is null)
+        {
+            if (now - _lastAimedInfo < TimeSpan.FromSeconds(3)) return;   // not more often than that: the site is asked only for a new one
+            _lastAimedInfo = now;
+        }
+        CharacterInfoWindow.Show(who.Name, who.Server, null, activate: false);
+    }
+
+    /// <summary>Where the character info window opens: remembered, else to the left of the overlay (not over it, not over the middle of the screen).</summary>
+    private void HookCharacterInfoPlace()
+    {
+        CharacterInfoWindow.LoadPlace = () => Settings is { CharInfoLeft: { } l, CharInfoTop: { } t, CharInfoWidth: { } w, CharInfoHeight: { } h } ? new Rect(l, t, w, h) : null;
+        CharacterInfoWindow.DefaultPlace = () =>
+        {
+            var area = SystemParameters.WorkArea;
+            double width = 700, height = Math.Min(640, area.Height - 40);
+            return new Rect(Math.Max(area.Left, _overlay.Left - width - 8), Math.Max(area.Top, _overlay.Top), width, height);
+        };
+        CharacterInfoWindow.SavePlace = (rect, flush) =>
+        {
+            (Settings.CharInfoLeft, Settings.CharInfoTop, Settings.CharInfoWidth, Settings.CharInfoHeight) = (rect.Left, rect.Top, rect.Width, rect.Height);
+            if (flush) SaveSettings();
+        };
+    }
+
     public void ToggleLive()
     {
         Settings.ShowLive = !Settings.ShowLive;
@@ -660,7 +705,7 @@ public sealed class Controller : IDisposable
     {
         WindowPrefs.AlwaysOnTop = Settings.AlwaysOnTop;
         foreach (Window w in Application.Current.Windows)
-            if (w is OverlayWindow or KillListWindow or LiveCombatWindow or KillDetailWindow) w.Topmost = Settings.AlwaysOnTop;
+            if (w is OverlayWindow or KillListWindow or LiveCombatWindow or KillDetailWindow or CharacterInfoWindow) w.Topmost = Settings.AlwaysOnTop;
     }
 
     private void UpdateKillListVisibility()
@@ -1029,6 +1074,9 @@ public sealed class Controller : IDisposable
                 break;
             case HotkeyAction.Live:
                 ToggleLive();
+                break;
+            case HotkeyAction.AimedInfo:
+                ToggleAimedInfo();
                 break;
         }
     }
