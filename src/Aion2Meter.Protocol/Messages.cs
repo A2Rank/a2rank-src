@@ -95,8 +95,24 @@ public sealed record PartyLeftMessage(ulong CharacterId) : PartyMessage(Characte
 /// <summary>
 /// 05 38 of type 0B or 0A: one tick of an over-time effect on <paramref name="Target"/> from <paramref name="Source"/> (type 0A, <paramref name="Damage"/>: damage over time of a debuff; 0B: the same entity for a heal over time such as 재생의 빛:
 /// 1,203 every 2 s, equal to the combat log). Other 05 38 types (state updates) are not parsed. docs/PROTOCOL.md §3.9.
+/// <paramref name="NoAmount"/>: the effect is on the target but no amount is read from the tick: type 0C (the same effect while a shield takes the damage: 2026-11-24 고통의 연쇄 on me went from
+/// 0A to 0C ticks the moment 유스티엘의 권능 was on me) and the 0A ticks of a tail shape that is not understood (most of them in the recordings of 2026-11-23/24). The ledger ignores these.
 /// </summary>
-public sealed record PeriodicMessage(uint Target, uint Source, uint SkillKey, uint Amount, bool Damage = false) : GameMessage;
+public sealed record PeriodicMessage(uint Target, uint Source, uint SkillKey, uint Amount, bool Damage = false, bool NoAmount = false) : GameMessage;
+
+/// <summary>
+/// 05 38 of type 09 or 08: an effect of <paramref name="Source"/> lands on <paramref name="Target"/> (09) or ends (<paramref name="Ended"/>, 08): `[target][09][source][varint][u32 stamp, high half = skill key]...`.
+/// Seen with shields, heals and buffs (on oneself and on others) and, by the same layout, assumed for the effects of enemies; what an effect does is not in the message (docs/PROTOCOL.md §3.9).
+/// </summary>
+public sealed record EffectMessage(uint Target, uint Source, uint SkillKey, bool Ended = false) : GameMessage;
+
+/// <summary>
+/// 2A 38: an effect with an id and a duration lands on <paramref name="Target"/> (2026-11-24 recordings): `[target][01][kind 11|13][handle varint][u32 effect id][u32 duration ms][u32 0][u64 time][source varint]...`.
+/// Kind 13 is an effect with a time (stun 3000, 받는 치유량 감소 10000, a potion 10000 ...), kind 11 the states and passives of the skills themselves (duration 0 or 4294967295 = permanent). The effect id is the id of the skill that
+/// gave it times 10 plus its number (183300301 = skill 18330030 [마르쿠탄의 분노], effect 1; the generic ones such as 100000311 = 기절 are not a skill of their own).
+/// Checked with 마르쿠탄의 분노 on a monster: stun 3000 ms (100000311), 받는 치유량 감소 10000 ms (183300301), a third 5000 ms (187800011); the removal of each comes 3.0 s, 10.0 s and 5.1 s later as `2c 38` with the handle. docs/PROTOCOL.md §3.9.
+/// </summary>
+public sealed record EffectAppliedMessage(uint Target, uint Source, uint EffectId, uint DurationMs, byte Kind) : GameMessage;
 
 /// <summary>
 /// 41 36: something appeared near me (entity number); a summon names its owner in this message ("신성한 기운 [아라]"). <paramref name="Owner"/> is that name,
@@ -148,6 +164,7 @@ public static class MessageParser
                 (0x0B, 0x94) => ParseDuel(m),
                 (0x41, 0x36) => ParseSpawn(m),
                 (0x05, 0x38) => ParsePeriodic(m),
+                (0x2A, 0x38) => ParseEffectApplied(m),
                 (0x08, 0x92) => ParsePartyJoin(m),
                 (0x01, 0x91) => ParseFieldBoss(m),
                 _ => null,
@@ -387,13 +404,29 @@ public static class MessageParser
     // 05 38: target varint, 0B (a heal over time: source varint, a varint (47 in the first recordings, 8f 06 or 9b 06 in later ones), u32 stamp (high half = skill key),
     // varint counter, varint amount, then one byte and a varint (or just a varint), 01)
     // or 0A (damage over time on a target: source varint, varint, u32 stamp, varint amount, 48, varint, 01).
-    private static PeriodicMessage? ParsePeriodic(ReadOnlySpan<byte> m)
+    private static GameMessage? ParsePeriodic(ReadOnlySpan<byte> m)
     {
         var r = new ByteReader(m, 2);
         uint target = r.Varint();
         byte type = r.Byte();
-        if (type != 0x0B && type != 0x0A) return null;
+        if (type is 0x09 or 0x08)
+        {
+            // `<source> <varint> <u32 stamp>` and more: an effect lands on the target (09) or ends (08), the same layout as the ticks; the rest (amounts of shields and heals) is not read here
+            uint from = r.Varint();
+            r.Varint();
+            uint applied = r.UInt32();
+            return m.Length - r.Position >= 1 ? new EffectMessage(target, from, applied >> 16, Ended: type == 0x08) : null;
+        }
+        if (type != 0x0B && type != 0x0A && type != 0x0C) return null;
         uint source = r.Varint();
+        if (type == 0x0C)
+        {
+            // `<source> <varint> <u32 stamp> 01 <u32 of the shield> <a few bytes> 01`: the tick of a damage effect that a shield took in full (no amount)
+            r.Varint();
+            uint effect = r.UInt32();
+            if (r.Position + 5 > m.Length || m[r.Position] != 0x01 || m.Length - 1 - (r.Position + 5) is < 0 or > 6 || m[^1] != 1) return null;
+            return new PeriodicMessage(target, source, effect >> 16, 0, true, NoAmount: true);
+        }
         uint stamp, amount;
         if (type == 0x0B)
         {
@@ -407,10 +440,30 @@ public static class MessageParser
         }
         r.Varint();
         stamp = r.UInt32();
+        int afterStamp = r.Position;
         amount = r.Varint();
         r.Varint();
         r.Varint();
-        return r.Position == m.Length - 1 && m[^1] == 1 && amount > 0 ? new PeriodicMessage(target, source, stamp >> 16, amount, true) : null;
+        if (r.Position == m.Length - 1 && m[^1] == 1 && amount > 0) return new PeriodicMessage(target, source, stamp >> 16, amount, true);
+        // A tail of another shape (most ticks in the recordings of 2026-11-23/24: `<byte> <2 bytes> 01` or `... 00`, the same bytes tick after tick, so not an amount):
+        // the effect is on the target, but no number is read from it.
+        return m.Length - afterStamp is >= 2 and <= 12 ? new PeriodicMessage(target, source, stamp >> 16, 0, true, NoAmount: true) : null;
+    }
+
+    // 2a 38 (first entry only: the messages seen have one): target varint, count, kind, handle varint, u32 effect id, u32 duration, u32, u64 time, source varint
+    private static EffectAppliedMessage? ParseEffectApplied(ReadOnlySpan<byte> m)
+    {
+        var r = new ByteReader(m, 2);
+        uint target = r.Varint();
+        if (r.Byte() == 0) return null;
+        byte kind = r.Byte();
+        if (kind is not (0x11 or 0x13)) return null;
+        r.Varint();
+        uint effect = r.UInt32(), duration = r.UInt32();
+        r.UInt32();
+        r.UInt64();
+        uint source = r.Varint();
+        return effect == 0 ? null : new EffectAppliedMessage(target, source, effect, duration, kind);
     }
 
     // 41 36: entity varint, `5f` and three more bytes, then either `01 <length> <owner name>` (a summon of a player: 5f 00 00 00 01 06 ec9584eb9dbc = 아라) or a single `00`

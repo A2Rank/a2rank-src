@@ -87,6 +87,8 @@
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
                     <Button x:Name="RecordsButton" Content="&#xE81C;" Style="{StaticResource IconButton}" Click="OnRecords"
                             ToolTip="내 기록: 서버에 저장된 구간 기록과 처치·사망 (나만 볼 수 있음)" />
+                    <Button x:Name="LiveButton" Content="&#xE9D9;" Style="{StaticResource IconButton}"
+                            Click="OnLive" ToolTip="실시간 전투 창 보이기/숨기기 (지금 싸우는 상대별 준 피해/받은 피해)" />
                     <Button x:Name="KillListButton" Content="&#xE8FD;" Style="{StaticResource IconButton}"
                             Click="OnKillList" ToolTip="처치 명단 창 보이기/숨기기" />
                 </StackPanel>

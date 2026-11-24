@@ -88,3 +88,24 @@ public class TargetTests
     private static (int, string) Seen(TargetedPlayer? p) => (p!.ClassCode, p.Name);
     private static (int, string, uint) Seen3(TargetedPlayer? p) => (p!.ClassCode, p.Name, p.Id);
 }
+
+/// <summary>What I aim at as the entity number the damage and effect messages use (a player's raw number is not it).</summary>
+public class AimedEntityTests
+{
+    private static readonly DateTimeOffset T0 = new(2026, 11, 24, 21, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void A_player_is_found_by_the_raw_number_of_its_identity_and_a_monster_is_its_own_number()
+    {
+        var w = new TargetWatcher();
+        Assert.Equal(0u, w.Aimed);
+        // 2026-11-24 21:11 recording: the identity of a player with entity 5421 has the raw number 10925 (what the target message names)
+        w.Observe(new IdentityMessage(5421, "적", 60, 2, 2004, RawId: 10925, ClassCode: 17), T0);
+        w.Observe(new TargetMessage(10925, true), T0.AddSeconds(1));
+        Assert.Equal(5421u, w.Aimed);
+        w.Observe(new TargetMessage(22941, true), T0.AddSeconds(5));     // a monster: no identity, one number
+        Assert.Equal(22941u, w.Aimed);
+        w.Observe(new TargetMessage(0, false), T0.AddSeconds(8));        // cleared
+        Assert.Equal(0u, w.Aimed);
+    }
+}

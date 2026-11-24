@@ -137,10 +137,13 @@ public sealed class TcpFlow
             _waitingSince ??= segment.Time;
             if (_pending.Values.Sum(p => p.Length) <= MaxPending && segment.Time - _waitingSince < GapTimeout)
                 return ([], broken);
-            // Gap: continue from the earliest buffered data with a fresh decoder.
+            // Gap: continue from the earliest buffered data with a fresh decoder. What arrived after it stays buffered and is joined below:
+            // dropping it made the next segment look like a new hole, again for 2 s, again and again (every 2 s a break, hardly any message decoded afterwards: 2026-11-24).
             abs = _pending.Keys.First();
             data = _pending[abs];
+            var later = _pending.Where(p => p.Key != abs).ToList();
             Reset();
+            foreach (var p in later) _pending[p.Key] = p.Value;
             _expected = abs;
             broken = true;
         }
@@ -161,6 +164,7 @@ public sealed class TcpFlow
             }
         }
         if (_pending.Count == 0) _waitingSince = null;
+        else _waitingSince ??= segment.Time;   // another hole after the data just joined: wait for it from now
 
         try
         {

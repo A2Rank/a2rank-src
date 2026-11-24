@@ -74,7 +74,7 @@ public partial class OverlayWindow : Window
     {
         Native.SetClickThrough(this, on);
         PassButton.Content = on ? "" : "";
-        SettingsButton.IsEnabled = ExitButton.IsEnabled = KillListButton.IsEnabled = !on;
+        SettingsButton.IsEnabled = ExitButton.IsEnabled = KillListButton.IsEnabled = LiveButton.IsEnabled = !on;
     }
 
     /// <param name="statusBrush">Resource key of the status dot color.</param>
@@ -132,12 +132,19 @@ public partial class OverlayWindow : Window
     private void OnSettings(object sender, RoutedEventArgs e) => _controller.ShowSettings();
     private void OnExit(object sender, RoutedEventArgs e) => _controller.Exit();
     private void OnKillList(object sender, RoutedEventArgs e) => _controller.ToggleKillList();
+    private void OnLive(object sender, RoutedEventArgs e) => _controller.ToggleLive();
     private void OnRecords(object sender, RoutedEventArgs e) => _controller.ShowRecords();
 
     /// <summary>The list icon is lit while the kill list window is shown.</summary>
     public void SetKillListShown(bool shown)
     {
         KillListButton.Foreground = Brush(shown ? "AccentBrush" : "FaintBrush");
+    }
+
+    /// <summary>The chart icon is lit while the live fight window is shown.</summary>
+    public void SetLiveShown(bool shown)
+    {
+        LiveButton.Foreground = Brush(shown ? "AccentBrush" : "FaintBrush");
     }
 }
 

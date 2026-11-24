@@ -142,3 +142,38 @@ public class FieldBossTests
         static byte[] Build(int times) => AlertTone.Build(times, 70);
     }
 }
+
+public class DingDongTests
+{
+    private static int Peak(byte[] wav) { int peak = 0; for (int i = 44; i + 1 < wav.Length; i += 2) peak = Math.Max(peak, Math.Abs(BitConverter.ToInt16(wav, i))); return peak; }
+
+    [Fact]
+    public void The_debuff_tone_is_two_notes_longer_than_the_target_tone_and_follows_the_volume()
+    {
+        var ding = AlertTone.BuildDingDong(60);
+        Assert.True(ding.Length > AlertTone.BuildShort(60).Length * 3);                   // about 0.7 s against 0.2 s
+        Assert.True(Peak(AlertTone.BuildDingDong(100)) > Peak(AlertTone.BuildDingDong(40)));
+        Assert.Equal(0, Peak(AlertTone.BuildDingDong(0)));
+        Assert.True(Peak(AlertTone.BuildDingDong(100)) < short.MaxValue);
+        // the second note starts after the first has mostly died away: the signal is lower just before it than at the start
+        int Slice(int fromMs, int toMs) { int p = 0; for (int i = 44 + fromMs * 44 * 2; i < 44 + toMs * 44 * 2 && i + 1 < ding.Length; i += 2) p = Math.Max(p, Math.Abs(BitConverter.ToInt16(ding, i))); return p; }
+        Assert.True(Slice(0, 20) > Slice(200, 235));
+        Assert.True(Slice(240, 260) > Slice(200, 235));
+    }
+}
+
+public class RisingToneTests
+{
+    private static int Peak(byte[] wav) { int peak = 0; for (int i = 44; i + 1 < wav.Length; i += 2) peak = Math.Max(peak, Math.Abs(BitConverter.ToInt16(wav, i))); return peak; }
+
+    [Fact]
+    public void The_alert_for_the_one_I_aim_at_sounds_different_from_the_one_for_me()
+    {
+        var rising = AlertTone.BuildRising(60);
+        Assert.NotEqual(AlertTone.BuildDingDong(60), rising);
+        Assert.True(rising.Length < AlertTone.BuildDingDong(60).Length);                  // quicker
+        Assert.True(Peak(AlertTone.BuildRising(100)) > Peak(AlertTone.BuildRising(40)));
+        Assert.Equal(0, Peak(AlertTone.BuildRising(0)));
+        Assert.True(Peak(AlertTone.BuildRising(100)) < short.MaxValue);
+    }
+}

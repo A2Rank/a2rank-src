@@ -144,6 +144,7 @@ public sealed class MeterSession
     private void Handle(GameMessage message, StreamToken token, DateTimeOffset time)
     {
         if (message is SpawnMessage { Template: not 0 } spawned) Matcher.Damage.NoteSpawn(spawned.Entity, spawned.Template);
+        if (message is SpawnMessage spawn) Matcher.NoteSpawn(spawn);
         switch (message)
         {
             case EnterWorldMessage m:

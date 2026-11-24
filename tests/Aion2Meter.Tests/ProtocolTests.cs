@@ -146,6 +146,29 @@ public class ProtocolTests
         Assert.Contains(pipeline.Feed(Bytes.Ethernet(next + 999, [], 0x11), 1, T0.AddSeconds(4)), e => e is ClosedEvent);
     }
 
+    [Fact]
+    public void After_a_gap_everything_that_arrived_behind_the_hole_is_decoded_not_only_its_first_segment()
+    {
+        // 2026-11-24: a recording that began in the middle of a stream (the data before it missing) had its segments behind the hole thrown away at the 2 s timeout, which made the next
+        // segment a new hole, again and again: a break every 2 s and hardly a message.
+        var pipeline = new Pipeline();
+        uint seq = 9000;
+        var points = new List<ulong>();
+        // a first segment, then a hole of 4,000 bytes, then segments one after the other (more than one frame each), 0.3 s apart
+        pipeline.Feed(Bytes.Ethernet(seq, Bytes.Frame(Bytes.Point(1))), 1, T0);
+        seq += 4000 + (uint)Bytes.Frame(Bytes.Point(1)).Length;
+        for (int i = 0; i < 12; i++)
+        {
+            byte[] segment = [.. Bytes.Frame(Bytes.Point(100 + (ulong)i)), .. Bytes.Frame(Bytes.Point(200 + (ulong)i)), .. Bytes.Frame(Bytes.Point(300 + (ulong)i))];
+            foreach (var e in pipeline.Feed(Bytes.Ethernet(seq, segment), 1, T0.AddSeconds(0.3 * (i + 1))).OfType<MessageEvent>()) points.Add(((PointMessage)e.Message).Total);
+            seq += (uint)segment.Length;
+        }
+        // (the 2 s timeout passed during the 12 segments: nothing after it is lost)
+        Assert.Contains(100UL, points);
+        Assert.Contains(311UL, points);
+        Assert.Equal(36, points.Count);
+    }
+
     // Real 04 38 messages from a training-dummy fight (entity ids only). Target 38750 = the dummy, source 3218 = me;
     // the totals and extra damages are the numbers the game's combat log printed for the same hits (docs/PROTOCOL.md §3.6).
     [Theory]

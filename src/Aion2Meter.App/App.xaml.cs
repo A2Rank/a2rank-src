@@ -11,7 +11,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Paths.MigrateFromOldName();
-        _single = new Mutex(true, @"Local\A2Rank", out bool first);
+        // (development with another data folder, A2RANK_DATA: may run beside the real one)
+        _single = new Mutex(true, Environment.GetEnvironmentVariable("A2RANK_DATA") is { Length: > 0 } ? @"Local\A2Rank-dev" : @"Local\A2Rank", out bool first);
         if (!first)
         {
             MessageBox.Show("A2Rank가 이미 실행 중입니다. 작업 표시줄 오른쪽 트레이 아이콘을 확인하세요.", "A2Rank");

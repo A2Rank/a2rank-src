@@ -19,11 +19,13 @@ public sealed class Controller : IDisposable
 
     private readonly ConcurrentQueue<CaptureEvent> _queue = new();
     private readonly TargetWatcher _targets = new();
+    private readonly DebuffWatcher _debuffs = new();
     private readonly CaptureService _capture = new();
     private readonly DispatcherTimer _pump = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly OverlayWindow _overlay;
     private readonly KillListWindow _killList;
+    private readonly LiveCombatWindow _live;
     private readonly ReleaseWindow _release;
     private SettingsWindow? _settingsWindow;
     private Forms.NotifyIcon? _tray;
@@ -57,6 +59,7 @@ public sealed class Controller : IDisposable
         };
         _overlay = new OverlayWindow(this);
         _killList = new KillListWindow { Width = Settings.KillListWidth, Height = Settings.KillListHeight };
+        _live = new LiveCombatWindow { Width = Settings.LiveWidth, Height = Settings.LiveHeight };
         _release = new ReleaseWindow(() => SetPassthrough(false));
     }
 
@@ -99,9 +102,30 @@ public sealed class Controller : IDisposable
             if (_settingsWindow?.IsVisible == true) _settingsWindow.Refresh(DateTimeOffset.Now);
         };
         _killList.SizeChanged += (_, _) => (Settings.KillListWidth, Settings.KillListHeight) = (_killList.Width, _killList.Height);
+        _live.Dragged += () =>
+        {
+            (Settings.LiveLeft, Settings.LiveTop) = (_live.Left, _live.Top);
+            SaveSettings();
+        };
+        _live.SizeChanged += (_, _) => (Settings.LiveWidth, Settings.LiveHeight) = (_live.Width, _live.Height);
+        _live.SortChanged += sort =>
+        {
+            Settings.LiveSort = (int)sort;
+            SaveSettings();
+            Refresh(force: true);
+        };
+        _live.Reset += () =>
+        {
+            Session.Matcher.Damage.ClearLive();
+            Refresh(force: true);
+        };
+        _live.ShowSort((LiveSort)Math.Clamp(Settings.LiveSort, 0, 2));
+        WindowPrefs.AlwaysOnTop = Settings.AlwaysOnTop;
         ApplyPanelOpacity();
         _overlay.Show();
+        ApplyTopmost();
         UpdateKillListVisibility();
+        UpdateLiveVisibility();
 
         _pump.Tick += (_, _) => Pump();
         _clock.Tick += (_, _) =>
@@ -194,6 +218,7 @@ public sealed class Controller : IDisposable
         ApplyPanelOpacity();
         _overlay.SetPassthrough(on);
         Native.SetClickThrough(_killList, on);
+        Native.SetClickThrough(_live, on);
         if (on && _overlay.IsVisible)
         {
             _release.Place(_overlay.PassButtonBounds);
@@ -216,6 +241,7 @@ public sealed class Controller : IDisposable
             _release.Hide();
         }
         UpdateKillListVisibility();
+        UpdateLiveVisibility();
     }
 
     /// <summary>Applies the panel background opacity live; saved with the settings.</summary>
@@ -532,6 +558,12 @@ public sealed class Controller : IDisposable
         SettingsChanged();
     }
 
+    public void ToggleLive()
+    {
+        Settings.ShowLive = !Settings.ShowLive;
+        SettingsChanged();
+    }
+
     public void ShowSettings()
     {
         _settingsWindow ??= new SettingsWindow(this);
@@ -550,8 +582,10 @@ public sealed class Controller : IDisposable
 
     public void SettingsChanged()
     {
+        ApplyTopmost();
         Session.Kills.Threshold = Settings.PinThreshold;
         UpdateKillListVisibility();
+        UpdateLiveVisibility();
         RegisterHotkeys();
         SaveSettings();
         Refresh();
@@ -593,6 +627,7 @@ public sealed class Controller : IDisposable
             try
             {
                 Session.Handle(e);
+                if (e is MessageEvent { Message: var message } && _debuffs.Observe(message, Session.Matcher.SelfEntity, e.Time, Session.Matcher.IsEnemy, Settings.TargetDebuffAlert ? _targets.Aimed : (uint?)null) is { } debuff) OnDebuff(debuff, _debuffs.LastOnMe);
             }
             catch (Exception ex)
             {
@@ -602,12 +637,13 @@ public sealed class Controller : IDisposable
         if (_dirty) Refresh();
     }
 
-    private void Refresh()
+    private void Refresh(bool force = false)
     {
         _dirty = false;
         var now = PreviewNow ?? DateTimeOffset.Now;
         _overlay.Display(Session, now, StatusText(now), StatusBrush(now));
         _killList.Display(PreviewKills ?? Session.Kills);
+        if (Settings.ShowLive && _overlayVisible) _live.Display(Session.Matcher.Live(now), (LiveSort)Math.Clamp(Settings.LiveSort, 0, 2), Math.Clamp(Settings.LiveRows, 3, 40), force);
         if (_settingsWindow?.IsVisible == true) _settingsWindow.Refresh(now);
         if (_tray is not null) _tray.Text = $"A2Rank · 이번 구간 {Fmt.Signed(Session.Buckets.Current?.Net ?? 0)}";
     }
@@ -617,6 +653,14 @@ public sealed class Controller : IDisposable
     {
         if (Settings.KillListDocked || Settings.KillListLeft is null || Settings.KillListTop is null) _killList.DockUnder(_overlay);
         else (_killList.Left, _killList.Top) = (Settings.KillListLeft.Value, Settings.KillListTop.Value);
+    }
+
+    /// <summary>The windows of the meter above everything else, or not (settings, "항상 맨 위에 표시"); the "해제" button of the click-through mode always stays on top.</summary>
+    private void ApplyTopmost()
+    {
+        WindowPrefs.AlwaysOnTop = Settings.AlwaysOnTop;
+        foreach (Window w in Application.Current.Windows)
+            if (w is OverlayWindow or KillListWindow or LiveCombatWindow or KillDetailWindow) w.Topmost = Settings.AlwaysOnTop;
     }
 
     private void UpdateKillListVisibility()
@@ -629,6 +673,24 @@ public sealed class Controller : IDisposable
             Native.SetClickThrough(_killList, _passthrough);
         }
         else _killList.Hide();
+    }
+
+    private void UpdateLiveVisibility()
+    {
+        _overlay.SetLiveShown(Settings.ShowLive);
+        if (Settings.ShowLive && _overlayVisible)
+        {
+            if (!_live.IsVisible)
+            {
+                var area = SystemParameters.WorkArea;
+                _live.Left = Settings.LiveLeft ?? Math.Max(area.Left, _killList.Left - _live.Width - 6);   // by default next to the kill list, on its left
+                _live.Top = Settings.LiveTop ?? _killList.Top;
+                _live.Show();
+            }
+            Native.SetClickThrough(_live, _passthrough);
+            Refresh(force: true);
+        }
+        else _live.Hide();
     }
 
     // ---- field boss alerts: 감시자 카이라 and 정령왕 아그로, both at fixed game hours (FieldBosses)
@@ -670,6 +732,54 @@ public sealed class Controller : IDisposable
         Log.Write($"target alert: {PlayerClass.Name(who.ClassCode)} ({who.Id})");
         BossSound.PlayTarget(Settings.TargetVolume);
     }
+
+    /// <summary>A damaging effect of another player landed on me: a short tone when it is one the user chose (settings, "디버프 알림").</summary>
+    private void OnDebuff(string name, bool onMe)
+    {
+        if (onMe)
+        {
+            if (!Settings.DebuffAlert || !Settings.DebuffNames.Contains(name)) return;
+            Log.Write($"debuff alert (on me): {name}");
+            BossSound.PlayDebuff(Settings.DebuffVolume);
+        }
+        else
+        {
+            if (!Settings.TargetDebuffAlert || !Settings.TargetDebuffNames.Contains(name)) return;
+            Log.Write($"debuff alert (on the target): {name}");
+            BossSound.PlayTargetDebuff(Settings.TargetDebuffVolume);
+        }
+    }
+
+    /// <summary>The debuffs (by name) that landed on me since the app started, for the list in the settings.</summary>
+    public IEnumerable<string> DebuffsSeen => _debuffs.Seen.Keys;
+
+    public void SetDebuffAlert(bool enabled, string[] names)
+    {
+        (Settings.DebuffAlert, Settings.DebuffNames) = (enabled, names);
+        SaveSettings();
+    }
+
+    public void SetDebuffVolume(int volume)
+    {
+        Settings.DebuffVolume = Math.Clamp(volume, 0, 100);
+        SaveSettings();
+    }
+
+    public void PlayDebuffPreview() => BossSound.PlayDebuff(Settings.DebuffVolume);
+
+    public void SetTargetDebuffAlert(bool enabled, string[] names)
+    {
+        (Settings.TargetDebuffAlert, Settings.TargetDebuffNames) = (enabled, names);
+        SaveSettings();
+    }
+
+    public void SetTargetDebuffVolume(int volume)
+    {
+        Settings.TargetDebuffVolume = Math.Clamp(volume, 0, 100);
+        SaveSettings();
+    }
+
+    public void PlayTargetDebuffPreview() => BossSound.PlayTargetDebuff(Settings.TargetDebuffVolume);
 
     public void SetTargetAlert(bool enabled, int[] classes)
     {
@@ -916,6 +1026,9 @@ public sealed class Controller : IDisposable
                 break;
             case HotkeyAction.KillList:
                 ToggleKillList();
+                break;
+            case HotkeyAction.Live:
+                ToggleLive();
                 break;
         }
     }

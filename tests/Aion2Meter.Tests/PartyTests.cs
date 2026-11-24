@@ -481,8 +481,9 @@ public class HealReceivedTests
         Assert.Equal("재생의 빛", Skills.Name(p.SkillKey));
         // the first tick has a longer counter
         Assert.Equal(1203u, Assert.IsType<PeriodicMessage>(MessageParser.Parse(Convert.FromHexString("0538a80a0ba80a4713f5dd65cb8301b30992c70401"))).Amount);
-        // an effect that has no amount (type 09) is something else
-        Assert.Null(MessageParser.Parse(Convert.FromHexString("0538a80a09a80a4713f5dd65fe8c0192c70401")));
+        // an effect that has no amount (type 09) is not a tick: it is the message that the effect landed
+        var landed = Assert.IsType<EffectMessage>(MessageParser.Parse(Convert.FromHexString("0538a80a09a80a4713f5dd65fe8c0192c70401")));
+        Assert.Equal((1320u, 1320u, 0x65DDu, false), (landed.Target, landed.Source, landed.SkillKey, landed.Ended));
     }
 
     [Fact]

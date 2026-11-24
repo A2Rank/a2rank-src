@@ -20,6 +20,20 @@ public sealed class TargetWatcher
     private readonly Dictionary<ushort, TargetedPlayer> _known = [];
     private readonly Dictionary<uint, DateTimeOffset> _recent = [];
     private uint _current;
+
+    private readonly Dictionary<ushort, uint> _entityOf = [];
+
+    /// <summary>
+    /// The entity number of what I aim at now (0: none), the number the damage and effect messages use; read from another thread than the packet thread.
+    /// The target message names a player by the raw number of its identity (45 36), which is not the entity number (2026-11-24: 10925 -> entity 5421); a monster has no identity and its two numbers are one.
+    /// </summary>
+    public uint Aimed
+    {
+        get
+        {
+            lock (_lock) return _current == 0 ? 0 : _current <= ushort.MaxValue && _entityOf.TryGetValue((ushort)_current, out var entity) ? entity : _current;
+        }
+    }
     private uint _awaiting;   // the target whose class was unknown: an identity message for it may still come
 
     /// <summary>For the log: identity messages seen, the biggest entity number among them, targets that counted.</summary>
@@ -37,6 +51,8 @@ public sealed class TargetWatcher
                 {
                     if (_known.Count >= MaxKnown) _known.Clear();
                     _known[m.RawId] = new TargetedPlayer(m.ClassCode, m.Name);
+                    if (_entityOf.Count >= MaxKnown) _entityOf.Clear();
+                    _entityOf[m.RawId] = m.Entity;
                     if (m.RawId > MaxSeen) MaxSeen = m.RawId;
                     Identities++;
                     if (_awaiting == m.RawId && m.ClassCode != 0) { _awaiting = 0; return _known[m.RawId] with { Id = m.RawId }; }   // the one I aim at was not known yet: tell now

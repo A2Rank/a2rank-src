@@ -29,6 +29,9 @@ public partial class SettingsWindow : Window
         KeepForever.IsChecked = s.NameKeepDays is not (7 or 30);
         ShowKillList.IsChecked = s.ShowKillList;
         DockKillList.IsChecked = s.KillListDocked;
+        AlwaysOnTop.IsChecked = s.AlwaysOnTop;
+        ShowLive.IsChecked = s.ShowLive;
+        LiveRowsText.Text = s.LiveRows.ToString();
         OpacitySlider.Value = Math.Round(s.PanelOpacity * 100);
         PassOpacitySlider.Value = Math.Round(s.PassthroughOpacity * 100);
         BossVolumeSlider.Value = s.BossVolume;
@@ -110,6 +113,7 @@ public partial class SettingsWindow : Window
         var c = _controller;
         DockKillList.IsChecked = c.Settings.KillListDocked;
         ShowKillList.IsChecked = c.Settings.ShowKillList;
+        ShowLive.IsChecked = c.Settings.ShowLive;
         MeasureButton.Content = c.Session.Measuring ? "측정 중지" : "측정 시작";
         CaptureStatus.Text = c.StatusText(now);
         NpcapLink.Visibility = c.CaptureProblem is not null ? Visibility.Visible : Visibility.Collapsed;
@@ -133,11 +137,12 @@ public partial class SettingsWindow : Window
         UploadStatus.Text = _forgetResult ?? c.WindowStatusText();
         ForgetButton.IsEnabled = c.Settings.InstallId is not null;
         RefreshTarget();
+        RefreshDebuff();
         RefreshBoss(now);
     }
 
 
-    private static readonly string[] Pages = ["PageMeasure", "PageScreen", "PageBoss", "PageData", "PageInfo"];
+    private static readonly string[] Pages = ["PageMeasure", "PageScreen", "PageBoss", "PageDebuff", "PageData", "PageInfo"];
 
     /// <summary>A category tab was picked: only its page is shown.</summary>
     private void OnTab(object sender, RoutedEventArgs e)
@@ -178,6 +183,131 @@ public partial class SettingsWindow : Window
         _controller.SetTargetAlert(TargetAlert.IsChecked == true, classes);
         RefreshTarget();
     }
+
+    // The two debuff alerts have the same shape: a switch, a list of names (per class, then the others), a volume and a test.
+    private sealed class DebuffSection(CheckBox enable, StackPanel panel, Slider slider, TextBlock volumeText)
+    {
+        public CheckBox Enable { get; } = enable;
+        public StackPanel Panel { get; } = panel;
+        public Slider Slider { get; } = slider;
+        public TextBlock VolumeText { get; } = volumeText;
+        public string Signature = "";
+        // the groups of the list: header, its names and the box panel (a group is opened by a click on its header; it stays open when the list is built again)
+        public List<(TextBlock Header, string Title, string[] Names, WrapPanel Wrap)> Groups { get; } = [];
+        public HashSet<string> Open { get; } = [];
+        public bool Built;
+        public IEnumerable<CheckBox> Boxes => Panel.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<CheckBox>());
+    }
+
+    private DebuffSection? _mine, _aimed;
+    private DebuffSection Mine => _mine ??= new DebuffSection(DebuffAlert, DebuffPanel, DebuffVolumeSlider, DebuffVolumeText);
+    private DebuffSection Aimed => _aimed ??= new DebuffSection(TargetDebuffAlert, TargetDebuffPanel, TargetDebuffVolumeSlider, TargetDebuffVolumeText);
+
+    private static string[] Chosen(DebuffSection s) => s.Boxes.Where(b => b.IsChecked == true).Select(b => (string)b.Tag).ToArray();
+
+    private void OnDebuffChanged(object sender, RoutedEventArgs e)
+    {
+        _controller.SetDebuffAlert(Mine.Enable.IsChecked == true, Chosen(Mine));
+        RefreshDebuff();
+    }
+
+    private void OnTargetDebuffChanged(object sender, RoutedEventArgs e)
+    {
+        _controller.SetTargetDebuffAlert(Aimed.Enable.IsChecked == true, Chosen(Aimed));
+        RefreshDebuff();
+    }
+
+    /// <summary>
+    /// The lists: the debuffs known by name, per class (<see cref="DebuffWatcher.Catalog"/>), and below them the others that were chosen (and, for the one on me, that landed on me since the start;
+    /// new ones are added while the window is open).
+    /// </summary>
+    private void RefreshDebuff()
+    {
+        var s = _controller.Settings;
+        Refresh(Mine, s.DebuffAlert, s.DebuffNames, s.DebuffVolume, _controller.DebuffsSeen, OnDebuffChanged);
+        Refresh(Aimed, s.TargetDebuffAlert, s.TargetDebuffNames, s.TargetDebuffVolume, [], OnTargetDebuffChanged);
+    }
+
+    private void Refresh(DebuffSection section, bool enabled, string[] chosen, int volume, IEnumerable<string> seen, RoutedEventHandler changed)
+    {
+        section.Enable.IsChecked = enabled;
+        var inCatalog = DebuffWatcher.CommonNames.ToHashSet();
+        var others = chosen.Concat(seen).Where(n => !inCatalog.Contains(n)).Distinct().OrderBy(n => n, StringComparer.Ordinal).ToList();
+        string signature = string.Join(",", others);
+        if (signature != section.Signature || section.Panel.Children.Count == 0)
+        {
+            section.Signature = signature;
+            section.Panel.Children.Clear();
+            section.Groups.Clear();
+            void Group(string title, IEnumerable<string> names)
+            {
+                var list = names.ToArray();
+                // the first time, a group with something chosen in it is open; the rest are closed (the list is long)
+                if (!section.Built && list.Any(chosen.Contains)) section.Open.Add(title);
+                var header = new TextBlock { Style = (Style)FindResource("Note"), Margin = new Thickness(0, 8, 0, 0), FontWeight = FontWeights.SemiBold, Cursor = Cursors.Hand, Tag = title };
+                var wrap = new WrapPanel { Visibility = section.Open.Contains(title) ? Visibility.Visible : Visibility.Collapsed };
+                header.MouseLeftButtonUp += (_, _) =>
+                {
+                    bool open = wrap.Visibility != Visibility.Visible;
+                    wrap.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+                    if (open) section.Open.Add(title); else section.Open.Remove(title);
+                    HeaderText(section, header, title, list);
+                };
+                foreach (var name in list)
+                {
+                    var box = new CheckBox { Content = name, Tag = name, Margin = new Thickness(0, 3, 16, 3) };
+                    box.Click += changed;
+                    wrap.Children.Add(box);
+                }
+                section.Panel.Children.Add(header);
+                section.Panel.Children.Add(wrap);
+                section.Groups.Add((header, title, list, wrap));
+            }
+            foreach (var (group, names) in DebuffWatcher.Catalog) Group(group, names);
+            if (others.Count > 0) Group(seen.Any() ? "그 밖에 (나에게 걸린 적이 있는 것 등)" : "그 밖에", others);
+            section.Built = true;
+        }
+        foreach (var box in section.Boxes)
+        {
+            box.IsChecked = chosen.Contains((string)box.Tag);
+            box.IsEnabled = enabled;
+        }
+        foreach (var (header, title, list, _) in section.Groups) HeaderText(section, header, title, list);
+        section.Slider.IsEnabled = enabled;
+        if (section.Slider.Value != volume) section.Slider.Value = volume;
+    }
+
+    /// <summary>"▸ 검성 (2/6)": closed or open, and how many of its names are chosen.</summary>
+    private void HeaderText(DebuffSection section, TextBlock header, string title, string[] names)
+    {
+        int count = names.Count(n => section.Boxes.Any(b => (string)b.Tag == n && b.IsChecked == true));
+        header.Text = (section.Open.Contains(title) ? "▾ " : "▸ ") + title + (count > 0 ? $" ({count}/{names.Length})" : $" ({names.Length})");
+        header.Foreground = (System.Windows.Media.Brush)FindResource(count > 0 ? "AccentBrush" : "FaintBrush");
+    }
+
+    private void OnDebuffVolume(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (DebuffVolumeText is null) return; // during InitializeComponent
+        DebuffVolumeText.Text = $"{e.NewValue:0}%";
+        if (_loading) return;
+        _controller.SetDebuffVolume((int)e.NewValue);
+    }
+
+    private void OnDebuffVolumeDone(object sender, MouseButtonEventArgs e) => _controller.PlayDebuffPreview();
+
+    private void OnDebuffTest(object sender, RoutedEventArgs e) => _controller.PlayDebuffPreview();
+
+    private void OnTargetDebuffVolume(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (TargetDebuffVolumeText is null) return; // during InitializeComponent
+        TargetDebuffVolumeText.Text = $"{e.NewValue:0}%";
+        if (_loading) return;
+        _controller.SetTargetDebuffVolume((int)e.NewValue);
+    }
+
+    private void OnTargetDebuffVolumeDone(object sender, MouseButtonEventArgs e) => _controller.PlayTargetDebuffPreview();
+
+    private void OnTargetDebuffTest(object sender, RoutedEventArgs e) => _controller.PlayTargetDebuffPreview();
 
     private void RefreshTarget()
     {
@@ -395,7 +525,9 @@ public partial class SettingsWindow : Window
         s.AutoUpdate = AutoUpdate.IsChecked == true;
         s.RecordPackets = Record.IsChecked == true;
         s.ShowKillList = ShowKillList.IsChecked == true;
+        s.AlwaysOnTop = AlwaysOnTop.IsChecked == true;
         s.KillListDocked = DockKillList.IsChecked == true;
+        s.ShowLive = ShowLive.IsChecked == true;
         s.Hotkeys = Hotkeys.IsChecked == true;
         _controller.SettingsChanged();
     }
@@ -429,6 +561,16 @@ public partial class SettingsWindow : Window
 
     private void OnThresholdDown(object sender, RoutedEventArgs e) => SetThreshold(_controller.Settings.PinThreshold - 1);
     private void OnThresholdUp(object sender, RoutedEventArgs e) => SetThreshold(_controller.Settings.PinThreshold + 1);
+
+    private void OnLiveRowsDown(object sender, RoutedEventArgs e) => SetLiveRows(_controller.Settings.LiveRows - 1);
+    private void OnLiveRowsUp(object sender, RoutedEventArgs e) => SetLiveRows(_controller.Settings.LiveRows + 1);
+
+    private void SetLiveRows(int n)
+    {
+        _controller.Settings.LiveRows = Math.Clamp(n, 3, 40);
+        LiveRowsText.Text = _controller.Settings.LiveRows.ToString();
+        _controller.SettingsChanged();
+    }
 
     private void SetThreshold(int n)
     {

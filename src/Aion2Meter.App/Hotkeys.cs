@@ -3,16 +3,17 @@ using System.Windows.Input;
 namespace Aion2Meter.App;
 
 /// <summary>What a global shortcut does.</summary>
-public enum HotkeyAction { Overlay, Passthrough, KillList }
+public enum HotkeyAction { Overlay, Passthrough, KillList, Live }
 
 public static class HotkeyActions
 {
-    public static readonly HotkeyAction[] All = [HotkeyAction.Overlay, HotkeyAction.Passthrough, HotkeyAction.KillList];
+    public static readonly HotkeyAction[] All = [HotkeyAction.Overlay, HotkeyAction.Passthrough, HotkeyAction.KillList, HotkeyAction.Live];
 
     public static string Label(HotkeyAction a) => a switch
     {
         HotkeyAction.Overlay => "표시창 보이기/숨기기",
         HotkeyAction.Passthrough => "마우스 통과 켜기/끄기",
+        HotkeyAction.Live => "실시간 전투 창 보이기/숨기기",
         _ => "처치 명단 보이기/숨기기",
     };
 
@@ -20,6 +21,7 @@ public static class HotkeyActions
     {
         HotkeyAction.Overlay => "Ctrl+Alt+O",
         HotkeyAction.Passthrough => "Ctrl+Alt+P",
+        HotkeyAction.Live => "Ctrl+Alt+K",
         _ => "Ctrl+Alt+L",
     };
 }

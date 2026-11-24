@@ -82,7 +82,7 @@ public sealed class DamageLedger
 
     private readonly Dictionary<uint, Entry> _entries = [];
     // Every hit I took lately (also from monsters), kept briefly to tell who hurt me before I died.
-    private readonly List<(DateTimeOffset Time, uint Source, uint Skill, long Total)> _recent = [];
+    private readonly List<(DateTimeOffset Time, uint Source, uint Skill, long Total, HitStats How)> _recent = [];
 
     // Life I received lately (from myself or others), kept for the fights that include it. Action points are not life.
     private readonly List<(DateTimeOffset Time, uint Skill, long Amount)> _heals = [];
@@ -124,6 +124,7 @@ public sealed class DamageLedger
     /// </summary>
     public void Add(PeriodicMessage p, uint? self, DateTimeOffset time)
     {
+        if (p.NoAmount) return;   // no amount read (a tick a shield took, or a shape of tail that is not understood): the effect is there, no damage to add
         if (Skills.IsShield(p.SkillKey)) return;   // a shield is neither damage nor life (유스티엘의 권능 of a party member arrived as damage on me)
         if (!p.Damage)
         {
@@ -136,18 +137,20 @@ public sealed class DamageLedger
         uint key = Skills.Canonical(Skills.SpiritKey(_templates.GetValueOrDefault(p.Source), p.SkillKey));
         if (!dealt && p.Target == me)
         {
-            _recent.Add((time, p.Source, key, p.Amount));
+            _recent.Add((time, p.Source, key, p.Amount, HitStats.Empty));
             if (_recent.Count > MaxRecent) _recent.RemoveRange(0, _recent.Count - MaxRecent);
         }
         if (!dealt && p.Target != me) return;
         uint other = dealt ? p.Target : p.Source;
         if (!Entities.IsPlayer(other)) return;
-        var e = EntryOf(other, time);
-        var skills = dealt ? e.DealtSkills : e.ReceivedSkills;
-        var s = skills.GetValueOrDefault(key, (0, 0L, HitStats.Empty));
-        skills[key] = (s.Item1, s.Item2 + p.Amount, s.Item3);
-        if (dealt) e.Dealt += p.Amount; else e.Received += p.Amount;
-        e.Last = time;
+        Each(other, time, e =>
+        {
+            var skills = dealt ? e.DealtSkills : e.ReceivedSkills;
+            var s = skills.GetValueOrDefault(key, (0, 0L, HitStats.Empty));
+            skills[key] = (s.Item1, s.Item2 + p.Amount, s.Item3);
+            if (dealt) e.Dealt += p.Amount; else e.Received += p.Amount;
+            e.Last = time;
+        });
     }
 
     /// <summary>
@@ -161,31 +164,72 @@ public sealed class DamageLedger
         uint key = Skills.Canonical(Skills.SpiritKey(_templates.GetValueOrDefault(d.Source), d.SkillKey));
         if (d.Target == me && Entities.IsPlayer(d.Source))
         {
-            var e = EntryOf(d.Source, time);
-            e.ReceivedHow = e.ReceivedHow.AddDodge();
-            var s = e.ReceivedSkills.GetValueOrDefault(key, (0, 0L, HitStats.Empty));
-            e.ReceivedSkills[key] = (s.Item1, s.Item2, s.Item3.AddDodge());
-            e.Last = time;
+            // (an attack of theirs that I dodged also belongs to who hurt me before a death: no damage, a dodge in how it landed)
+            _recent.Add((time, d.Source, key, 0, HitStats.Empty.AddDodge()));
+            if (_recent.Count > MaxRecent) _recent.RemoveRange(0, _recent.Count - MaxRecent);
+            Each(d.Source, time, e =>
+            {
+                e.ReceivedHow = e.ReceivedHow.AddDodge();
+                var s = e.ReceivedSkills.GetValueOrDefault(key, (0, 0L, HitStats.Empty));
+                e.ReceivedSkills[key] = (s.Item1, s.Item2, s.Item3.AddDodge());
+                e.Last = time;
+            });
         }
         else if (d.Source == me && Entities.IsPlayer(d.Target))
         {
-            var e = EntryOf(d.Target, time);
-            e.DealtHow = e.DealtHow.AddDodge();
-            var s = e.DealtSkills.GetValueOrDefault(key, (0, 0L, HitStats.Empty));
-            e.DealtSkills[key] = (s.Item1, s.Item2, s.Item3.AddDodge());
-            e.Last = time;
+            Each(d.Target, time, e =>
+            {
+                e.DealtHow = e.DealtHow.AddDodge();
+                var s = e.DealtSkills.GetValueOrDefault(key, (0, 0L, HitStats.Empty));
+                e.DealtSkills[key] = (s.Item1, s.Item2, s.Item3.AddDodge());
+                e.Last = time;
+            });
         }
     }
 
-    private Entry EntryOf(uint other, DateTimeOffset time)
+    // The line of an opponent; with <paramref name="idle"/> a line without a hit for that long starts over.
+    private static Entry EntryIn(Dictionary<uint, Entry> entries, uint other, DateTimeOffset time, TimeSpan? idle = null)
     {
-        if (!_entries.TryGetValue(other, out var e))
-        {
-            if (_entries.Count >= MaxOpponents) _entries.Remove(_entries.MinBy(x => x.Value.Last).Key);
-            _entries[other] = e = new Entry { First = time };
-        }
-        return e;
+        if (entries.TryGetValue(other, out var e) && (idle is null || time - e.Last <= idle)) return e;
+        if (e is null && entries.Count >= MaxOpponents) entries.Remove(entries.MinBy(x => x.Value.Last).Key);
+        return entries[other] = new Entry { First = time };
     }
+
+    /// <summary>Does <paramref name="apply"/> on the fight with <paramref name="other"/> in both books: the one a kill or death closes, and the live board.</summary>
+    private void Each(uint other, DateTimeOffset time, Action<Entry> apply)
+    {
+        apply(EntryIn(_entries, other, time));
+        apply(EntryIn(_live, other, time, LiveIdle));
+    }
+
+    // ---- the live board: the same numbers, but a kill or death does not close a line (it stays while the fight goes on)
+
+    /// <summary>A line of the live board that has seen no hit for this long starts over with the next one (and is not shown any more).</summary>
+    public static readonly TimeSpan LiveIdle = TimeSpan.FromSeconds(120);
+    private readonly Dictionary<uint, Entry> _live = [];
+
+    /// <summary>One opponent of the live board: what we did to each other since the fight began (or the last <see cref="ClearLive"/>).</summary>
+    public sealed record LiveOpponent(uint Entity, string Name, int Server, int Class, long Dealt, long Received, int DealtHits, int ReceivedHits,
+        IReadOnlyList<SkillDamage> DealtSkills, IReadOnlyList<SkillDamage> ReceivedSkills, HitStats DealtHow, HitStats ReceivedHow, DateTimeOffset First, DateTimeOffset Last);
+
+    /// <summary>
+    /// The players I am (or just was) fighting, the ones with the most damage between us first (what I did plus what I took): with many opponents
+    /// the top of this list is who matters. <paramref name="who"/> finds name, server and class from the entity number (null: not known).
+    /// </summary>
+    public IReadOnlyList<LiveOpponent> Live(DateTimeOffset now, Func<uint, (string Name, int Server, int Class)?> who)
+    {
+        foreach (var gone in _live.Where(x => now - x.Value.Last > LiveIdle).Select(x => x.Key).ToList()) _live.Remove(gone);
+        return [.. _live.Select(x =>
+        {
+            var e = x.Value;
+            var w = who(x.Key);
+            return new LiveOpponent(x.Key, w?.Name ?? "", w?.Server ?? 0, w?.Class ?? 0, e.Dealt, e.Received, e.DealtHits, e.ReceivedHits,
+                List(e.DealtSkills), List(e.ReceivedSkills), e.DealtHow, e.ReceivedHow, e.First, e.Last);
+        }).OrderByDescending(o => o.Dealt + o.Received).ThenBy(o => o.Entity)];
+    }
+
+    /// <summary>Empties the live board (the damage kept for the next kill or death is not touched).</summary>
+    public void ClearLive() => _live.Clear();
 
     // Entities of my summons (신성한 기운 ...): what they do counts as mine.
     private readonly HashSet<uint> _summons = [];
@@ -245,20 +289,22 @@ public sealed class DamageLedger
         uint key = Skills.Canonical(ResolveKey(d, time));
         if (!dealt && d.Target == me)
         {
-            _recent.Add((time, d.Source, key, d.Total));
+            _recent.Add((time, d.Source, key, d.Total, HitStats.Empty.Add(d)));
             if (_recent.Count > MaxRecent) _recent.RemoveRange(0, _recent.Count - MaxRecent);
         }
         if (!dealt && d.Target != me) return;
         uint other = dealt ? d.Target : d.Source;
         if (!Entities.IsPlayer(other)) return;
-        var e = EntryOf(other, time);
-        var skills = dealt ? e.DealtSkills : e.ReceivedSkills;
         // (the key is worked out once: a follow-up hit is told from the first one by what came before it)
-        var s = skills.GetValueOrDefault(key, (0, 0L, HitStats.Empty));
-        skills[key] = (s.Item1 + 1, s.Item2 + d.Total, s.Item3.Add(d));
-        if (dealt) { e.Dealt += d.Total; e.DealtHits++; e.DealtHow = e.DealtHow.Add(d); }
-        else { e.Received += d.Total; e.ReceivedHits++; e.ReceivedHow = e.ReceivedHow.Add(d); }
-        e.Last = time;
+        Each(other, time, e =>
+        {
+            var skills = dealt ? e.DealtSkills : e.ReceivedSkills;
+            var s = skills.GetValueOrDefault(key, (0, 0L, HitStats.Empty));
+            skills[key] = (s.Item1 + 1, s.Item2 + d.Total, s.Item3.Add(d));
+            if (dealt) { e.Dealt += d.Total; e.DealtHits++; e.DealtHow = e.DealtHow.Add(d); }
+            else { e.Received += d.Total; e.ReceivedHits++; e.ReceivedHow = e.ReceivedHow.Add(d); }
+            e.Last = time;
+        });
     }
 
     /// <summary>The damage exchanged with <paramref name="opponent"/> since the last kill of them; starts over afterwards. Null when there was none.</summary>
@@ -281,11 +327,12 @@ public sealed class DamageLedger
         var list = new List<AttackerDamage>();
         foreach (var g in hits.GroupBy(h => Entities.IsPlayer(h.Source) ? h.Source : 0u))
         {
-            var skills = g.GroupBy(h => h.Skill).Select(s => new SkillDamage(s.Key, s.Count(), s.Sum(h => h.Total)))
+            var skills = g.GroupBy(h => h.Skill).Select(s => new SkillDamage(s.Key, s.Count(h => h.How.Dodge == 0), s.Sum(h => h.Total),
+                    s.Aggregate((HitStats?)null, (acc, h) => HitStats.Merge(acc, h.How)) is { IsEmpty: false } how ? how : null))
                 .OrderByDescending(s => s.Total).ThenBy(s => s.Key).ToList();
             bool npc = g.Key == 0;
             var who = npc ? null : name(g.Key);
-            list.Add(new AttackerDamage(who?.Name ?? "", who?.Server ?? 0, g.Key, npc, g.Sum(h => h.Total), g.Count(), skills));
+            list.Add(new AttackerDamage(who?.Name ?? "", who?.Server ?? 0, g.Key, npc, g.Sum(h => h.Total), g.Count(h => h.How.Dodge == 0), skills));
         }
         return [.. list.OrderByDescending(a => a.Total)];
     }
@@ -296,6 +343,7 @@ public sealed class DamageLedger
     public void Clear()
     {
         _entries.Clear();
+        _live.Clear();
         _recent.Clear();
         _heals.Clear();
         _summons.Clear();

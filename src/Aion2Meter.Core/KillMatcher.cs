@@ -56,6 +56,7 @@ public sealed class KillMatcher
         _deaths.Clear();
         _credited.Clear();
         _pending.Clear();
+        _summonOwners.Clear();
         _unmatched.Clear();
         Damage.Clear();
         SelfEntity = null;
@@ -73,6 +74,7 @@ public sealed class KillMatcher
         _deaths.Clear();
         _credited.Clear();
         Damage.Clear();
+        _summonOwners.Clear();
         SelfName = name;
         SelfRankingRace = race is 1 or 2 ? race : null;
         SelfEntity = entity;
@@ -86,6 +88,39 @@ public sealed class KillMatcher
         SelfRankingRace = race is 1 or 2 ? race : null;
         foreach (var (entity, c) in _identities)
             if (c.Name == name) SelfEntity = entity;
+    }
+
+    /// <summary>Name, server and class of a player entity as far as the game told them; null when not known.</summary>
+    public (string Name, int Server, int Class)? Who(uint entity) =>
+        _identities.TryGetValue(entity, out var c) && c.Name.Length > 0 ? (c.Name, c.Server, c.Class) : null;
+
+    /// <summary>The live board: players I am fighting right now, most damage between us first (<see cref="DamageLedger.Live"/>).</summary>
+    public IReadOnlyList<DamageLedger.LiveOpponent> Live(DateTimeOffset now) => Damage.Live(now, Who);
+
+    /// <summary>Is this entity hostile to me: a monster or NPC, or a player of the other race. Unknown races count as not hostile (no guessing: a party member must never be taken for an enemy).</summary>
+    private readonly Dictionary<uint, (uint Entity, string Name)> _summonOwners = [];
+    private const int MaxSummonOwners = 4096;
+
+    /// <summary>Something appeared (41 36): when it is a summon, who it belongs to (by entity number or name), so that a spirit of mine or of a friend is not taken for an enemy.</summary>
+    public void NoteSpawn(SpawnMessage m)
+    {
+        if (Entities.IsPlayer(m.Entity) || (m.OwnerEntity == 0 && m.Owner.Length == 0)) return;
+        if (_summonOwners.Count >= MaxSummonOwners) _summonOwners.Clear();
+        _summonOwners[m.Entity] = (m.OwnerEntity, m.Owner);
+    }
+
+    public bool IsEnemy(uint entity)
+    {
+        if (!Entities.IsPlayer(entity))
+        {
+            // A summon is as hostile as its owner; a monster (no owner seen) is hostile.
+            if (!_summonOwners.TryGetValue(entity, out var owner)) return true;
+            if (owner.Entity != 0) return owner.Entity != SelfEntity && IsEnemy(owner.Entity);
+            if (owner.Name == SelfName) return false;
+            var named = _identities.FirstOrDefault(i => i.Value.Name == owner.Name);
+            return named.Value is not null && IsEnemy(named.Key);
+        }
+        return _identities.TryGetValue(entity, out var c) && c.Race is 1 or 2 && MyRace() is int mine && c.Race != mine;
     }
 
     public int? MyRace()

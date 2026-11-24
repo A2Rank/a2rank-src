@@ -46,14 +46,56 @@
         </DataTemplate>
 
         <!-- One attacker before a death: name and amount, their top skills below -->
+        <!-- An expander without the system look: the header is the whole line, a small arrow shows whether it is open -->
+        <Style x:Key="AttackerExpander" TargetType="Expander">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <StackPanel>
+                            <ToggleButton IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" Focusable="False" Cursor="Hand" Foreground="{StaticResource TextBrush}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent" Padding="0,2">
+                                            <DockPanel>
+                                                <TextBlock x:Name="Arrow" DockPanel.Dock="Left" Text="&#x25B8;" Width="14" FontSize="11" Foreground="{StaticResource FaintBrush}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                                <ContentPresenter />
+                                            </DockPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Arrow" Property="Text" Value="&#x25BE;" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <ContentPresenter ContentSource="Header" />
+                            </ToggleButton>
+                            <ContentPresenter x:Name="Body" Visibility="Collapsed" Margin="14,2,0,0" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="Body" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate x:Key="AttackerLineTemplate">
-            <StackPanel Margin="0,1.5,0,4">
-                <Grid>
-                    <TextBlock Text="{Binding Name}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,110,0" />
-                    <TextBlock Text="{Binding Amount}" Style="{StaticResource Caption}" FontSize="11" HorizontalAlignment="Right" />
-                </Grid>
-                <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" FontSize="10" TextWrapping="Wrap" Visibility="{Binding DetailVisibility}" />
-            </StackPanel>
+            <Expander Style="{StaticResource AttackerExpander}" IsExpanded="{Binding Expanded, Mode=OneTime}" IsEnabled="{Binding CanExpand}" Margin="0,1.5,0,4">
+                <Expander.Header>
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="{Binding Name}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,110,0" />
+                            <TextBlock Text="{Binding Amount}" Style="{StaticResource Caption}" FontSize="11" HorizontalAlignment="Right" />
+                        </Grid>
+                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" FontSize="10" TextWrapping="Wrap" Visibility="{Binding DetailVisibility}" />
+                    </StackPanel>
+                </Expander.Header>
+                <ItemsControl ItemsSource="{Binding Skills}" ItemTemplate="{StaticResource SkillLineTemplate}" />
+            </Expander>
         </DataTemplate>
 
         <!-- Left list of the single kills: plain lines, the chosen one lit -->
@@ -146,7 +188,7 @@
                 </ListBox>
 
                 <!-- The chosen one in detail -->
-                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer x:Name="DetailScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel x:Name="Detail" Margin="0,0,6,0">
                         <TextBlock x:Name="NoDamage" Text="이 기록에는 피해 정보가 없습니다 (이름 확인 전이거나 전투를 보지 못한 경우)."
                                    Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed" />
@@ -158,7 +200,7 @@
                         <ItemsControl x:Name="ReceivedLines" ItemTemplate="{StaticResource SkillLineTemplate}" />
                         <TextBlock x:Name="HealedHeader" Text="받은 회복 (스킬별)" Style="{StaticResource SectionLabel}" Foreground="{StaticResource GainBrush}" />
                         <ItemsControl x:Name="HealedLines" ItemTemplate="{StaticResource SkillLineTemplate}" />
-                        <TextBlock x:Name="AttackerHeader" Text="사망 직전 30초 동안 받은 피해 (공격자별)" Style="{StaticResource SectionLabel}" Foreground="{StaticResource LossBrush}" />
+                        <TextBlock x:Name="AttackerHeader" Text="사망 직전 30초 동안 받은 피해 (공격자별, 눌러서 펼치기)" Style="{StaticResource SectionLabel}" Foreground="{StaticResource LossBrush}" />
                         <ItemsControl x:Name="AttackerLines" ItemTemplate="{StaticResource AttackerLineTemplate}" />
                     </StackPanel>
                 </ScrollViewer>

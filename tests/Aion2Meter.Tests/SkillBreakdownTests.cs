@@ -133,9 +133,56 @@ public class AttackerBreakdownTests
         Assert.Equal([KillerId, HelperId, 0u, UnknownPlayer], list.Select(a => a.Entity));
         Assert.True(list[2].IsNpc);
         Assert.Equal(1_000, list[2].Total);
-        Assert.Equal([new SkillDamage(Grace, 1, 9_000), new SkillDamage(Earth, 1, 3_000)], list[0].Skills);
+        Assert.Equal([(Grace, 1, 9_000L), (Earth, 1, 3_000L)], list[0].Skills.Select(s => (s.Key, s.Hits, s.Total)));
+        Assert.All(list[0].Skills, s => Assert.Equal(1, s.How!.Hits));                  // how the hits landed comes along (the detail window shows it per attacker)
         Assert.Equal(2, list[2].Hits);
         Assert.Empty(ledger.TakeAttackers(At(1, 11), Names));                // taken: the next death starts over
+    }
+
+    private static (string Name, int Server, int Class)? LiveNames(uint e) => e switch
+    {
+        KillerId => ("저승사자", 2004, 0),
+        HelperId => ("조수", 2004, 0),
+        _ => null,
+    };
+
+    [Fact]
+    public void The_live_board_lists_opponents_by_damage_between_us_and_keeps_them_after_a_kill_or_death()
+    {
+        var ledger = new DamageLedger();
+        ledger.Add(Hit(Me, KillerId, 9_000, Grace), Me, At(1, 1));                 // took 9,000 from the killer
+        ledger.Add(Hit(KillerId, Me, 3_000, Earth), Me, At(1, 2));                 // did 3,000 to the killer
+        ledger.Add(Hit(HelperId, Me, 20_000, Earth), Me, At(1, 3));                // did 20,000 to the helper
+        ledger.Add(Hit(Monster, Me, 99_999, Earth), Me, At(1, 3));                 // monsters are not on the board
+        var live = ledger.Live(At(1, 5), LiveNames);
+        Assert.Equal(["조수", "저승사자"], live.Select(o => o.Name));                 // 20,000 before 12,000
+        Assert.Equal((3_000L, 9_000L), (live[1].Dealt, live[1].Received));
+        Assert.Single(live[1].DealtSkills);
+
+        ledger.Take(KillerId, At(1, 6));                                           // the kill closes the fight record but not the board line
+        Assert.Equal(2, ledger.Live(At(1, 7), LiveNames).Count);
+
+        // a line with no hit for two minutes is gone, a new hit starts it over
+        Assert.Empty(ledger.Live(At(3, 30), LiveNames));
+        ledger.Add(Hit(Me, KillerId, 500, Grace), Me, At(4));
+        Assert.Equal(500L, Assert.Single(ledger.Live(At(4, 1), LiveNames)).Received);
+
+        ledger.ClearLive();
+        Assert.Empty(ledger.Live(At(4, 2), LiveNames));
+    }
+
+    [Fact]
+    public void An_attack_I_dodged_counts_in_how_the_attackers_hits_landed_but_is_not_a_hit()
+    {
+        var ledger = new DamageLedger();
+        ledger.Add(Hit(Me, KillerId, 9_000, Grace), Me, At(1, 1));
+        ledger.Add(new DodgeMessage(Me, KillerId, (uint)Grace << 16), Me, At(1, 2));
+        ledger.Add(new DodgeMessage(Me, HelperId, (uint)Earth << 16), Me, At(1, 3));      // only dodged: still someone who attacked me
+        var list = ledger.TakeAttackers(At(1, 10), Names);
+        Assert.Equal(["저승사자", "조수"], list.Select(a => a.Name));
+        Assert.Equal((9_000L, 1), (list[0].Total, list[0].Hits));                         // the dodge is not a hit
+        Assert.Equal((1, 1), (list[0].Skills[0].How!.Hits, list[0].Skills[0].How!.Dodge));
+        Assert.Equal((0L, 0, 1), (list[1].Total, list[1].Hits, list[1].Skills[0].How!.Dodge));
     }
 
     [Fact]
@@ -182,7 +229,8 @@ public class AttackerBreakdownTests
         Assert.Equal(2, back.Count);
         Assert.Equal(["저승사자", "조수", ""], back[0].Attackers!.Select(a => a.Name));
         Assert.Equal(9_000L, back[0].Attackers![0].Total);
-        Assert.Equal([new SkillDamage(Grace, 1, 9_000)], back[0].Attackers![0].Skills);
+        Assert.Equal([(Grace, 1, 9_000L)], back[0].Attackers![0].Skills.Select(s => (s.Key, s.Hits, s.Total)));
+        Assert.Equal(1, back[0].Attackers![0].Skills[0].How!.Hits);                       // and survives the store
         Assert.True(back[0].Attackers![2].IsNpc);
     }
 
@@ -255,5 +303,202 @@ public class NcCharacterTests
         Assert.Equal(["포에타", "이스할겐", "루터스"], new[] { Servers.Label(1021), Servers.Label(2021), Servers.Label(1012) });
         Assert.True(Servers.IsValid(1021) && Servers.IsValid(2021) && !Servers.IsValid(1022) && !Servers.IsValid(2022));
         Assert.Equal((1, 2), (Servers.RaceOf(1021), Servers.RaceOf(2021)));
+    }
+}
+/// <summary>A debuff of an enemy that lands on me, told by the name of its skill (docs/PROTOCOL.md §3.9).</summary>
+public class DebuffWatcherTests
+{
+    private const uint Me = 2853, Enemy = 1221, Mate = 3160, Chain = 0x65BF;
+    private static readonly DateTimeOffset T0 = new(2026, 11, 24, 21, 36, 20, Kst.Offset);
+    private static bool Hostile(uint e) => e == Enemy;
+
+    private static DamageMessage Hit(uint target, uint source, uint skillKey) => new(target, source, 0x36, 20993, 1000, [], skillKey << 16);
+
+    [Fact]
+    public void A_tick_a_shield_took_is_read_as_the_same_effect_without_an_amount()
+    {
+        // 21:36:25.000 recording: 고통의 연쇄 on me from #1221 while 유스티엘의 권능 (67d4) was on me
+        var tick = Assert.IsType<PeriodicMessage>(MessageParser.Parse(Convert.FromHexString("0538a5160cc509af029370bf650177e3d46772790401")));
+        Assert.Equal((Me, Enemy, 0x65BFu, 0u, true, true), (tick.Target, tick.Source, tick.SkillKey, tick.Amount, tick.Damage, tick.NoAmount));
+        // a damage tick of the same effect before it is the plain 0A one
+        var damage = Assert.IsType<PeriodicMessage>(MessageParser.Parse(Convert.FromHexString("0538a5160ac509af029370bf653b72790401")));
+        Assert.True(damage.NoAmount);   // (the tail of this shape is not an amount: only that the effect is on me is read)
+        Assert.Equal(0x65BFu, damage.SkillKey);
+    }
+
+    [Fact]
+    public void An_effect_that_lands_and_ends_is_read_from_the_09_and_08_messages()
+    {
+        // 21:11:52.484 recording: 십자 방어 (6fa3) from #31903 on #30701
+        var landed = Assert.IsType<EffectMessage>(MessageParser.Parse(Convert.FromHexString("0538ed77099f7cd00213b7a36f8c1512cc1d01")));
+        Assert.Equal((0x6FA3u, false), (landed.SkillKey, landed.Ended));
+        var ended = Assert.IsType<EffectMessage>(MessageParser.Parse(Convert.FromHexString("0538ed77089f7cd00213b7a36f8c1512cc1d01")));
+        Assert.True(ended.Ended);
+    }
+
+    [Fact]
+    public void A_shielded_tick_is_not_damage_in_the_ledger()
+    {
+        var ledger = new DamageLedger();
+        ledger.Add(new PeriodicMessage(Me, Enemy, Chain, 0, true, NoAmount: true), Me, T0);
+        Assert.Empty(ledger.Live(T0, _ => null));
+    }
+
+    [Fact]
+    public void Tells_a_damage_debuff_once_per_application_and_again_after_it_ended()
+    {
+        var w = new DebuffWatcher();
+        var tick = new PeriodicMessage(Me, Enemy, Chain, 59, true);
+        Assert.Equal("고통의 연쇄", w.Observe(tick, Me, T0, Hostile));
+        for (int i = 1; i <= 16; i++) Assert.Null(w.Observe(tick, Me, T0.AddSeconds(i * 0.5), Hostile));    // the ticks of the same debuff
+        Assert.Null(w.Observe(tick with { Amount = 0, NoAmount = true }, Me, T0.AddSeconds(8.5), Hostile));   // also while a shield takes them
+        Assert.Equal("고통의 연쇄", w.Observe(tick, Me, T0.AddSeconds(20), Hostile));                       // put on me anew
+        Assert.Contains("고통의 연쇄", w.Seen.Keys);
+    }
+
+    [Fact]
+    public void An_effect_is_named_by_the_skill_that_gave_it_and_one_skill_with_two_effects_is_one_alert()
+    {
+        var w = new DebuffWatcher();
+        // 마르쿠탄의 분노 (6d41) hits me: a stun (100000311, named by hand) and the heal reduction of the skill (183300301); the heal reduction of the cast after is told again
+        Assert.Null(w.Observe(Hit(Me, Enemy, 0x6D41), Me, T0, Hostile));
+        Assert.Equal("기절", w.Observe(new EffectAppliedMessage(Me, Enemy, 100000311, 3000, 0x13), Me, T0.AddSeconds(0.01), Hostile));
+        Assert.Equal("마르쿠탄의 분노", w.Observe(new EffectAppliedMessage(Me, Enemy, 183300301, 10000, 0x13), Me, T0.AddSeconds(0.05), Hostile));
+        Assert.Null(w.Observe(new EffectAppliedMessage(Me, Enemy, 183300302, 10000, 0x13), Me, T0.AddSeconds(0.1), Hostile));   // same name: no second sound
+        // later again (the effects of the next cast)
+        Assert.Null(w.Observe(Hit(Me, Enemy, 0x6D41), Me, T0.AddSeconds(30), Hostile));
+        Assert.Equal("마르쿠탄의 분노", w.Observe(new EffectAppliedMessage(Me, Enemy, 183300301, 10000, 0x13), Me, T0.AddSeconds(30.05), Hostile));
+        Assert.Contains("마르쿠탄의 분노", w.Seen.Keys);
+    }
+
+    [Fact]
+    public void An_effect_with_no_name_takes_the_skill_of_the_hit_before_it_else_its_id()
+    {
+        var w = new DebuffWatcher();
+        Assert.Equal("효과 999999999", w.Observe(new EffectAppliedMessage(Me, Enemy, 999999999, 3000, 0x13), Me, T0, Hostile));
+        Assert.Null(w.Observe(Hit(Me, Enemy, 0x6B59), Me, T0.AddSeconds(30), Hostile));
+        Assert.Equal("격파쇄", w.Observe(new EffectAppliedMessage(Me, Enemy, 999999998, 3000, 0x13), Me, T0.AddSeconds(30.2), Hostile));   // named after the hit
+        Assert.Null(w.Observe(Hit(Me, Mate, 0x6B68), Me, T0.AddSeconds(60), Hostile));                                                      // a hit of someone else does not name it
+        Assert.Equal("효과 999999997", w.Observe(new EffectAppliedMessage(Me, Enemy, 999999997, 3000, 0x13), Me, T0.AddSeconds(60.2), Hostile));
+    }
+
+    [Fact]
+    public void The_effects_of_a_분쇄격_and_a_대지의_약속_are_told_by_name()
+    {
+        // 23:00:35.825: 분쇄격 on a monster gives 방어력 감소 (181300002) and 허점 (100001301), 5 s each; a 호법 puts 대지의 약속 (187800011) on it with every hit
+        var w = new DebuffWatcher();
+        Assert.Equal("분쇄격", w.Observe(new EffectAppliedMessage(Me, Enemy, 181300002, 5000, 0x13), Me, T0, Hostile));
+        Assert.Equal("허점", w.Observe(new EffectAppliedMessage(Me, Enemy, 100001301, 5000, 0x13), Me, T0, Hostile));
+        Assert.Equal("대지의 약속", w.Observe(new EffectAppliedMessage(Me, Enemy, 187800011, 5000, 0x13), Me, T0.AddSeconds(0.1), Hostile));
+    }
+
+    [Fact]
+    public void Not_told_the_09_message_a_friend_a_state_a_field_or_my_own()
+    {
+        var w = new DebuffWatcher();
+        Assert.Null(w.Observe(new EffectMessage(Me, Enemy, 0x6C99), Me, T0, Hostile));                                          // sent for buffs and heals too
+        Assert.Null(w.Observe(new EffectAppliedMessage(Me, Mate, 183300301, 10000, 0x13), Me, T0, Hostile));                    // a friend
+        Assert.Null(w.Observe(new EffectAppliedMessage(Me, Enemy, 173500071, 2000, 0x11), Me, T0, Hostile));                    // a state of a skill, not a timed effect
+        Assert.Null(w.Observe(new EffectAppliedMessage(Enemy, Me, 183300301, 10000, 0x13), Me, T0, Hostile));                   // mine on someone
+        Assert.Null(w.Observe(new PeriodicMessage(Enemy, Me, Chain, 59, true), Me, T0, Hostile));                               // my tick on someone
+        Assert.Null(w.Observe(new PeriodicMessage(Me, Me, Chain, 59, true), Me, T0, Hostile));                                  // my own
+        Assert.Null(w.Observe(new PeriodicMessage(Me, Mate, 0x65DD, 1203, false), Me, T0, Hostile));                            // a heal
+        Assert.Null(w.Observe(new PeriodicMessage(Me, Mate, 0x67D4, 5000, true), Me, T0, Hostile));                             // a shield flagged as damage
+        Assert.Null(w.Observe(new PeriodicMessage(Me, Enemy, 0x5BBB, 100, true), Me, T0, Hostile));                             // a ground field (불의 장벽)
+        Assert.Null(w.Observe(new PeriodicMessage(Me, Enemy, 0x5A99, 0, true, NoAmount: true), Me, T0, Hostile));              // 냉기 폭풍
+        Assert.Null(w.Observe(new PeriodicMessage(Me, Enemy, Chain, 59, true), null, T0, Hostile));                             // my entity not known
+        Assert.Empty(w.Seen.Where(x => x.Key is "불의 장벽" or "냉기 폭풍"));
+    }
+
+    [Fact]
+    public void A_debuff_on_the_one_I_aim_at_is_told_when_it_comes_from_the_other_side()
+    {
+        const uint Mob = 50000, Other = 1222;          // a monster I aim at, another enemy
+        bool Hostile3(uint e) => e is Enemy or Mob or Other;
+        var w = new DebuffWatcher();
+        // my hit on it, then a stun with no skill of its own: named after my hit
+        Assert.Null(w.Observe(Hit(Mob, Me, 0x6D41), Me, T0, Hostile3, aimed: Mob));
+        Assert.Equal("기절", w.Observe(new EffectAppliedMessage(Mob, Me, 100000311, 3000, 0x13), Me, T0.AddSeconds(0.01), Hostile3, aimed: Mob));
+        Assert.Equal("마르쿠탄의 분노", w.Observe(new EffectAppliedMessage(Mob, Me, 183300301, 10000, 0x13), Me, T0.AddSeconds(0.05), Hostile3, aimed: Mob));
+        // a friend's debuff on it counts too; an enemy's effect on it (their own side) does not; nor does its own
+        Assert.Equal("허점", w.Observe(new EffectAppliedMessage(Mob, Mate, 100001301, 5000, 0x13), Me, T0.AddSeconds(10), Hostile3, aimed: Mob));
+        Assert.Null(w.Observe(new EffectAppliedMessage(Mob, Other, 100000201, 5000, 0x13), Me, T0.AddSeconds(20), Hostile3, aimed: Mob));
+        Assert.Null(w.Observe(new EffectAppliedMessage(Mob, Mob, 100000201, 5000, 0x13), Me, T0.AddSeconds(30), Hostile3, aimed: Mob));
+        // not aiming at it (or the option off: no entity given): nothing
+        Assert.Null(w.Observe(new EffectAppliedMessage(Mob, Me, 100000311, 3000, 0x13), Me, T0.AddSeconds(40), Hostile3));
+        Assert.Null(w.Observe(new EffectAppliedMessage(Mob, Me, 100000311, 3000, 0x13), Me, T0.AddSeconds(41), Hostile3, aimed: 777));
+        // aiming at a friend: an enemy\x27s debuff on them counts, mine does not
+        Assert.Equal("기절", w.Observe(new EffectAppliedMessage(Mate, Enemy, 100000311, 3000, 0x13), Me, T0.AddSeconds(50), Hostile3, aimed: Mate));
+        Assert.Null(w.Observe(new EffectAppliedMessage(Mate, Me, 100000311, 3000, 0x13), Me, T0.AddSeconds(60), Hostile3, aimed: Mate));
+        // damage over time on the one I aim at: once per application, per target
+        var tick = new PeriodicMessage(Mob, Me, Chain, 500, true);
+        Assert.Equal("고통의 연쇄", w.Observe(tick, Me, T0.AddSeconds(70), Hostile3, aimed: Mob));
+        Assert.Null(w.Observe(tick, Me, T0.AddSeconds(70.5), Hostile3, aimed: Mob));
+    }
+
+    [Fact]
+    public void It_says_whether_the_debuff_landed_on_me_or_on_the_one_I_aim_at()
+    {
+        const uint Mob = 50000;
+        bool Hostile3(uint e) => e is Enemy or Mob;
+        var w = new DebuffWatcher();
+        Assert.Equal("기절", w.Observe(new EffectAppliedMessage(Me, Enemy, 100000311, 3000, 0x13), Me, T0, Hostile3, aimed: Mob));
+        Assert.True(w.LastOnMe);
+        Assert.Equal("기절", w.Observe(new EffectAppliedMessage(Mob, Me, 100000311, 3000, 0x13), Me, T0.AddSeconds(10), Hostile3, aimed: Mob));
+        Assert.False(w.LastOnMe);
+    }
+
+    [Fact]
+    public void Hostile_means_a_monster_or_a_player_of_the_other_race_and_never_a_guess()
+    {
+        var matcher = new KillMatcher();
+        matcher.EnterWorld(Me, "나", 1, 1019);
+        matcher.OnIdentity(new IdentityMessage(Enemy, "적", 60, 2, 2004));
+        matcher.OnIdentity(new IdentityMessage(Mate, "아군", 60, 1, 1019));
+        Assert.True(matcher.IsEnemy(Enemy));
+        Assert.False(matcher.IsEnemy(Mate));
+        Assert.False(matcher.IsEnemy(4242));        // a player whose race is not known: not taken for an enemy
+        Assert.True(matcher.IsEnemy(27094));        // a monster
+        // a summon is as hostile as its owner (my 정령 gave effects to me and were taken for enemies)
+        matcher.NoteSpawn(new SpawnMessage(24719, "나", 0x2C8EFE));
+        matcher.NoteSpawn(new SpawnMessage(24720, "", 0x2C8EFE, Me));
+        matcher.NoteSpawn(new SpawnMessage(24721, "", 0x2C8EFE, Enemy));
+        matcher.NoteSpawn(new SpawnMessage(24722, "", 0x2C8EFE, Mate));
+        Assert.False(matcher.IsEnemy(24719));       // mine, by name
+        Assert.False(matcher.IsEnemy(24720));       // mine, by entity
+        Assert.True(matcher.IsEnemy(24721));        // an enemy's
+        Assert.False(matcher.IsEnemy(24722));       // a friend's
+        Assert.True(matcher.IsEnemy(24723));        // no owner seen: a monster
+    }
+
+    [Theory]
+    // the three effects of one 마르쿠탄의 분노 hit on monster #43620 (22:45:21.210 and .260): stun 3 s, 받는 치유량 감소 10 s, the third 5 s
+    [InlineData("2a38e4d40201130137e2f505b80b00000000000082dacd0da2010000f74401b8b1170100b8b995468017f44700702f45", 100000311u, 3000u)]
+    [InlineData("2a38e4d402011302cdf0ec0a1027000000000000daf5cd0da2010000f74401b8b1170100b8b995468017f44700702f45", 183300301u, 10000u)]
+    [InlineData("2a38e4d402011303cb99310b881300000000000084e2cd0da2010000f74410618f1e0100b8b995468017f44700702f45", 187800011u, 5000u)]
+    public void Reads_the_effect_id_and_how_long_it_lasts(string hex, uint effect, uint duration)
+    {
+        var m = Assert.IsType<EffectAppliedMessage>(MessageParser.Parse(Convert.FromHexString(hex)));
+        Assert.Equal((43620u, effect, duration, (byte)0x13), (m.Target, m.EffectId, m.DurationMs, m.Kind));
+    }
+
+    [Fact]
+    public void An_effect_id_is_named_by_the_skill_that_gave_it()
+    {
+        Assert.Equal("기절", EffectNames.Name(100000311));
+        Assert.Equal("허점", EffectNames.Name(100001301));
+        Assert.Equal("분쇄격", EffectNames.Name(181300002));
+        Assert.Equal("송곳 화살", EffectNames.Name(140500201));     // 출혈 8 s
+        Assert.Equal("봉인 화살", EffectNames.Name(141600201));     // 최대 행동력 감소 5 s
+        Assert.Equal("그리폰 화살", EffectNames.Name(140600401));   // 홍염 20 s
+        Assert.Equal("실명", EffectNames.Name(100000701));
+        Assert.Equal("봉인", EffectNames.Name(100000801));
+        Assert.Equal("회복 차단", EffectNames.Name(177600011));
+        Assert.Equal("전투 속도 감소", EffectNames.Name(100000111));
+        Assert.Equal("전투 속도 감소", EffectNames.Name(100000121));
+        Assert.Equal("공포", EffectNames.Name(162100001));
+        Assert.Equal("마르쿠탄의 분노", EffectNames.Name(183300301));
+        Assert.Equal("효과 999", EffectNames.Name(999));
+        Assert.Null(EffectNames.OfSkill(100000311));
     }
 }

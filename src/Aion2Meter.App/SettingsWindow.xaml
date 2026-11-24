@@ -225,6 +225,7 @@
                 <RadioButton x:Name="TabMeasure" Content="측정" Tag="PageMeasure" IsChecked="True" Style="{StaticResource TabButton}" Checked="OnTab" />
                 <RadioButton Content="화면" Tag="PageScreen" Style="{StaticResource TabButton}" Checked="OnTab" />
                 <RadioButton Content="알림" Tag="PageBoss" Style="{StaticResource TabButton}" Checked="OnTab" />
+                <RadioButton Content="디버프" Tag="PageDebuff" Style="{StaticResource TabButton}" Checked="OnTab" />
                 <RadioButton Content="기록·데이터" Tag="PageData" Style="{StaticResource TabButton}" Checked="OnTab" />
                 <RadioButton Content="정보" Tag="PageInfo" Style="{StaticResource TabButton}" Checked="OnTab" />
             </WrapPanel>
@@ -271,6 +272,13 @@
 
                         </StackPanel>
                         <StackPanel x:Name="PageScreen" Visibility="Collapsed">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="창 위치" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="AlwaysOnTop" Content="항상 맨 위에 표시" Click="OnChanged" />
+                            <TextBlock Text="표시창, 처치 명단, 실시간 전투, 자세히 보기 창이 다른 창 위에 항상 보입니다. 끄면 일반 창처럼 다른 창에 가려질 수 있습니다 (게임을 전체 화면으로 쓰면 가려져서 보이지 않을 수 있으니 '테두리 없는 창' 모드를 권장합니다)." Style="{StaticResource Note}" TextWrapping="Wrap" Margin="24,0,0,0" />
+                        </StackPanel>
+                    </Border>
                     <!-- Overlay -->
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
@@ -320,6 +328,23 @@
                                         VerticalAlignment="Center" ValueChanged="OnKillListOpacity" />
                             </DockPanel>
                             <TextBlock Text="표시창과 따로 정합니다. 건드리기 전에는 표시창과 같은 값을 따라갑니다." Style="{StaticResource Note}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Live fight -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="실시간 전투" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="ShowLive" Content="실시간 전투 창 표시" Click="OnChanged" />
+                            <TextBlock Text="지금 싸우는 상대별로 준 피해와 받은 피해를 보여 줍니다 (다른 플레이어와 주고받은 피해만). 많이 싸우는 상대가 위에 옵니다." Style="{StaticResource Note}" Margin="24,0,0,0" />
+                            <DockPanel Margin="0,8,0,0">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="−" Click="OnLiveRowsDown" Padding="10,2" />
+                                    <TextBlock x:Name="LiveRowsText" Width="40" TextAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    <Button Content="+" Click="OnLiveRowsUp" Padding="10,2" />
+                                </StackPanel>
+                                <TextBlock Text="목록에 나열할 상대 수 (나머지는 합쳐서 한 줄)" VerticalAlignment="Center" />
+                            </DockPanel>
                         </StackPanel>
                     </Border>
 
@@ -386,6 +411,42 @@
                         </StackPanel>
                     </Border>
 
+                        </StackPanel>
+                        <StackPanel x:Name="PageDebuff" Visibility="Collapsed">
+                    <!-- Debuff alert -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="나에게 걸린 디버프 알림" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="DebuffAlert" Content="선택한 디버프가 나에게 걸리면 짧은 알림음 (띵동)" Click="OnDebuffChanged" />
+                            <TextBlock Text="알릴 디버프 (여러 개 선택 가능)" Style="{StaticResource Note}" Margin="24,8,0,0" />
+                            <StackPanel x:Name="DebuffPanel" Margin="24,2,0,0" />
+                            <DockPanel Margin="24,6,0,0">
+                                <TextBlock Text="소리 크기" Width="70" VerticalAlignment="Center" />
+                                <TextBlock x:Name="DebuffVolumeText" DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                                <Slider x:Name="DebuffVolumeSlider" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" ValueChanged="OnDebuffVolume" PreviewMouseLeftButtonUp="OnDebuffVolumeDone" />
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="적(다른 종족 플레이어나 몬스터)이 나에게 거는 디버프 중 스킬 이름으로 고른 것이 걸리는 순간 한 번 알립니다. 무슨 효과인지는 상관없이 이름만 봅니다 (한 스킬이 기절과 치유량 감소를 같이 걸어도 한 번만 울립니다). 지속 피해 디버프(고통의 연쇄 등)는 계속되는 피해마다 울리지 않고, 풀렸다가 다시 걸리면 다시 알립니다. 목록에는 알려진 디버프와, 나에게 걸린 적이 있는 디버프가 자동으로 추가됩니다. 장판(불의 장벽, 냉기 폭풍)과 아군의 효과는 알리지 않습니다." />
+                            <Button Content="알림음 듣기" Click="OnDebuffTest" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <!-- Debuff alert: the one I aim at -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="조준한 상대에게 걸린 디버프 알림" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="TargetDebuffAlert" Content="내가 조준한 상대에게 선택한 디버프가 걸리면 짧은 알림음 (위쪽과 다른 소리)" Click="OnTargetDebuffChanged" />
+                            <TextBlock Text="알릴 디버프 (여러 개 선택 가능)" Style="{StaticResource Note}" Margin="24,8,0,0" />
+                            <StackPanel x:Name="TargetDebuffPanel" Margin="24,2,0,0" />
+                            <DockPanel Margin="24,6,0,0">
+                                <TextBlock Text="소리 크기" Width="70" VerticalAlignment="Center" />
+                                <TextBlock x:Name="TargetDebuffVolumeText" DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                                <Slider x:Name="TargetDebuffVolumeSlider" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" ValueChanged="OnTargetDebuffVolume" PreviewMouseLeftButtonUp="OnTargetDebuffVolumeDone" />
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="내가 조준한 상대에게 내가 건 디버프나 아군이 건 디버프가 걸리는 순간 한 번 알립니다 (아군을 조준했을 때는 적이 건 디버프). 나에게 걸리는 디버프와 목록과 소리 크기를 따로 정하고, 소리도 다릅니다 (위는 띵동, 이쪽은 올라가는 띠링). 한 스킬이 효과를 여러 개 걸어도 한 번만 울립니다." />
+                            <Button Content="알림음 듣기" Click="OnTargetDebuffTest" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
                         </StackPanel>
                         <StackPanel x:Name="PageData" Visibility="Collapsed">
                     <!-- Data sending -->

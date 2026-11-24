@@ -19,6 +19,14 @@ public sealed class AppSettings
     public bool TargetAlert { get; set; }
     public int[] TargetClasses { get; set; } = [];
     public int TargetVolume { get; set; } = 60;
+    /// <summary>Debuff alert: a short tone when a debuff of one of the chosen names (skill names) lands on me.</summary>
+    public bool DebuffAlert { get; set; }
+    public string[] DebuffNames { get; set; } = [];
+    public int DebuffVolume { get; set; } = 60;
+    /// <summary>The debuff alert of the one I aim at, apart from the one for me (its own names, volume and tone): a chosen debuff lands on it (mine, a friend's on an enemy; an enemy's on a friend I aim at).</summary>
+    public bool TargetDebuffAlert { get; set; }
+    public string[] TargetDebuffNames { get; set; } = [];
+    public int TargetDebuffVolume { get; set; } = 60;
     /// <summary>Volume of the alert sound, 0..100 (the app's own, not the system's).</summary>
     public int BossVolume { get; set; } = 70;
     /// <summary>Minutes before a spawn to alert at (any of 10, 5, 1).</summary>
@@ -28,6 +36,8 @@ public sealed class AppSettings
     /// <summary>The version whose changes were last shown; a different running version means the app was just updated.</summary>
     public string? LastSeenVersion { get; set; }
     public bool ShowKillList { get; set; } = true;
+    /// <summary>The overlay, the kill list, the live fight window and the detail windows stay above all other windows (off: they are ordinary windows that other windows, also the game, can cover).</summary>
+    public bool AlwaysOnTop { get; set; } = true;
     public bool Hotkeys { get; set; } = true;
     /// <summary>Shortcut per action name ("Ctrl+Alt+P"); "" turns one off. Missing actions use their default.</summary>
     public Dictionary<string, string> HotkeyBindings { get; set; } = [];
@@ -61,6 +71,14 @@ public sealed class AppSettings
     public double? KillListTop { get; set; }
     public double KillListWidth { get; set; } = 440;
     public double KillListHeight { get; set; } = 260;
+    /// <summary>The live fight window (실시간 전투): shown, order (0 total, 1 dealt, 2 received), lines listed, place and size.</summary>
+    public bool ShowLive { get; set; }
+    public int LiveSort { get; set; }
+    public int LiveRows { get; set; } = 10;
+    public double? LiveLeft { get; set; }
+    public double? LiveTop { get; set; }
+    public double LiveWidth { get; set; } = 330;
+    public double LiveHeight { get; set; } = 380;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
@@ -130,4 +148,10 @@ public static class Log
         }
         catch (IOException) { }
     }
+}
+
+/// <summary>Window options that windows read when they are made (set from the settings by the controller).</summary>
+public static class WindowPrefs
+{
+    public static bool AlwaysOnTop { get; set; } = true;
 }

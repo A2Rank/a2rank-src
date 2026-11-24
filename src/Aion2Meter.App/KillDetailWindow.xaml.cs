@@ -14,7 +14,8 @@ public sealed record HitChip(string Label, string Value);
 public sealed record SkillLine(string Name, string Total, string Share, Brush Bar, IReadOnlyList<HitChip> Chips, Visibility ChipsVisibility, string Usage);
 
 /// <summary>One attacker in the list of who hurt me before a death: name, amount and share, and their biggest skills.</summary>
-public sealed record AttackerLine(string Name, string Amount, string Detail, Visibility DetailVisibility);
+/// <param name="Skills">The attacker's skills as the same cards the skill lists use (empty for the "others" line); shown when the line is opened.</param>
+public sealed record AttackerLine(string Name, string Amount, string Detail, Visibility DetailVisibility, IReadOnlyList<SkillLine> Skills, bool Expanded, bool CanExpand);
 
 /// <summary>One choice in the left list: all kills of this player together, or a single one.</summary>
 public sealed record EntryChoice(string Title, string Points, Brush PointsColor, string Sub,
@@ -35,6 +36,7 @@ public partial class KillDetailWindow : Window
     public KillDetailWindow()
     {
         InitializeComponent();
+        Topmost = WindowPrefs.AlwaysOnTop;
     }
 
     public void Display(KillTally t, bool death)
@@ -42,14 +44,7 @@ public partial class KillDetailWindow : Window
         Brush Res(string key) => (Brush)FindResource(key);
         Brush gain = Res("GainBrush"), loss = Res("LossBrush");
 
-        _who = t.Name.Length > 0 && Servers.IsValid(t.Server) ? (t.Name, t.Server) : null;
-        // The class seen in the game; else the one their own skills against me belong to (the most damaging class skill).
-        int cls = t.Class != 0 ? t.Class
-            : t.ReceivedSkills?.Select(s => (Class: PlayerClass.FromSkillKey(s.Key), s.Total)).Where(x => x.Class != 0)
-                .GroupBy(x => x.Class).OrderByDescending(g => g.Sum(x => x.Total)).Select(g => g.Key).FirstOrDefault() ?? 0;
-        Title.Text = $"{t.Name}  {Servers.Label(t.Server)}" + (cls != 0 ? $"  ·  {PlayerClass.Name(cls)}" : "") + (_who is null ? "" : "  ↗");
-        Title.Cursor = _who is null ? null : Cursors.Hand;
-        Title.ToolTip = _who is null ? null : "눌러서 이 캐릭터의 장비와 정보를 봅니다 (공식 캐릭터 정보실, 이름과 서버가 그 사이트로 전달됩니다)";
+        SetTitle(t.Name, t.Server, DamageLines.ClassOf(t.Class, t.ReceivedSkills));
         Subtitle.Text = death ? $"나를 {t.Count}번 처치 · 마지막 {Kst.Of(t.Last):HH:mm}" : $"{t.Count}번 처치 · 마지막 {Kst.Of(t.Last):HH:mm}";
         TileOneLabel.Text = death ? "잃은 포인트" : "얻은 포인트";
         TileOne.Text = Fmt.Signed(t.Points);
@@ -81,6 +76,36 @@ public partial class KillDetailWindow : Window
         Entries.SelectedIndex = Math.Max(0, keep);
     }
 
+    private void SetTitle(string name, int server, int cls)
+    {
+        _who = name.Length > 0 && Servers.IsValid(server) ? (name, server) : null;
+        Title.Text = $"{(name.Length > 0 ? name : "(이름 모름)")}  {Servers.Label(server)}" + (cls != 0 ? $"  ·  {PlayerClass.Name(cls)}" : "") + (_who is null ? "" : "  ↗");
+        Title.Cursor = _who is null ? null : Cursors.Hand;
+        Title.ToolTip = _who is null ? null : "눌러서 이 캐릭터의 장비와 정보를 봅니다 (공식 캐릭터 정보실, 이름과 서버가 그 사이트로 전달됩니다)";
+    }
+
+    /// <summary>One opponent of the live board (<see cref="LiveCombatWindow"/>): no kills yet, just the fight so far. Called again while the fight goes on.</summary>
+    public void DisplayLive(DamageLedger.LiveOpponent o)
+    {
+        Brush Res(string key) => (Brush)FindResource(key);
+        double scroll = DetailScroll.VerticalOffset;
+        SetTitle(o.Name, o.Server, DamageLines.ClassOf(o.Class, o.ReceivedSkills));
+        Subtitle.Text = $"실시간 · 첫 타격 {Kst.Of(o.First):HH:mm:ss} · 마지막 {Kst.Of(o.Last):HH:mm:ss}";
+        TileOneLabel.Text = "싸운 시간";
+        TileOne.Text = $"{(int)(o.Last - o.First).TotalMinutes}:{(o.Last - o.First).Seconds:00}";
+        TileOne.Foreground = Res("TextBrush");
+        TileDealt.Text = o.Dealt > 0 ? Fmt.Damage(o.Dealt) : "-";
+        TileReceived.Text = o.Received > 0 ? Fmt.Damage(o.Received) : "-";
+        TileHealed.Text = "-";
+
+        var choice = new EntryChoice("실시간", "", Res("TextBrush"), Summary(o.Dealt, o.Received), o.Dealt, o.Received, o.DealtSkills, o.ReceivedSkills, null, o.DealtHow, o.ReceivedHow);
+        ListColumn.Width = new GridLength(0);
+        Entries.Visibility = Visibility.Collapsed;
+        Entries.ItemsSource = new[] { choice };
+        Entries.SelectedIndex = 0;
+        Dispatcher.BeginInvoke(() => DetailScroll.ScrollToVerticalOffset(scroll), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
     private static string Summary(long dealt, long received)
     {
         var parts = new List<string>();
@@ -96,7 +121,7 @@ public partial class KillDetailWindow : Window
         var dealt = DamageLines.Skills(c.DealtSkills, MaxLines);
         var received = DamageLines.Skills(c.ReceivedSkills, MaxLines);
         var healed = DamageLines.Skills(c.HealSkills?.Where(h => Protocol.Skills.IsLifeRecovery(h.Key)).ToList(), MaxLines, heal: true);
-        var attackers = DamageLines.Attackers(c.Attackers, MaxLines);
+        var attackers = DamageLines.Attackers(c.Attackers, DamageLines.MaxAttackers);
         DealtHow.Text = DamageLines.How(c.DealtHow, "내가 회복");
         DealtHow.Visibility = DealtHow.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         ReceivedHow.Text = DamageLines.How(c.ReceivedHow, "상대가 회복");
@@ -146,6 +171,14 @@ public partial class KillDetailWindow : Window
 /// <summary>Formats damage breakdowns as display lines (shared by the list and the detail window).</summary>
 public static class DamageLines
 {
+    /// <summary>Attackers listed one by one in the detail of a death (a 30 vs 30 fight has dozens), skill cards per attacker, and how many of them start open.</summary>
+    public const int MaxAttackers = 60, MaxAttackerSkills = 12, OpenAttackers = 3;
+
+    /// <summary>The class seen in the game; else the one their own skills against me belong to (the most damaging class skill); 0 when neither says.</summary>
+    public static int ClassOf(int seen, IReadOnlyList<SkillDamage>? skillsAgainstMe) =>
+        seen != 0 ? seen
+        : skillsAgainstMe?.Select(s => (Class: PlayerClass.FromSkillKey(s.Key), s.Total)).Where(x => x.Class != 0)
+            .GroupBy(x => x.Class).OrderByDescending(g => g.Sum(x => x.Total)).Select(g => g.Key).FirstOrDefault() ?? 0;
 
     /// <summary>The totals line: "타수 35 · 크리 94% · 전방 20% · 후방 80% · 완벽 6% · 강타 43% · 다단 71% · 막기 11% · 완벽 막기 0% · 회피 8% · 철벽 0% · 재생 49% · 상대가 회복 6,200".</summary>
     public static string How(HitStats? h, string healedLabel)
@@ -214,17 +247,19 @@ public static class DamageLines
         if (attackers is null || attackers.Count == 0) return [];
         long total = Math.Max(1, attackers.Sum(a => a.Total));
         string Share(long v) => v * 100 / total < 1 ? "<1%" : $"{v * 100.0 / total:0}%";
-        AttackerLine Line(string name, long amount, IReadOnlyList<SkillDamage> skills)
+        // Every attacker opens into the same skill cards as the killer's (how the hits landed too, for records made since 0.2.27); the biggest few start open.
+        AttackerLine Line(string name, long amount, IReadOnlyList<SkillDamage> skills, bool open)
         {
             string top = string.Join(" · ", SkillDamage.Merge(skills, null).Take(4).Select(s => $"{Protocol.Skills.Name(s.Key)} {Fmt.Damage(s.Total)}"));
-            return new AttackerLine(name, $"{Fmt.Damage(amount)}  {Share(amount)}", top, top.Length > 0 ? Visibility.Visible : Visibility.Collapsed);
+            var cards = Skills(skills, MaxAttackerSkills);
+            return new AttackerLine(name, $"{Fmt.Damage(amount)}  {Share(amount)}", top, top.Length > 0 && !open ? Visibility.Visible : Visibility.Collapsed, cards, open && cards.Count > 0, cards.Count > 0);
         }
         string Name(AttackerDamage a) => a.IsNpc ? "몬스터·NPC" : a.Name.Length > 0 ? a.Name : $"#{a.Entity}";
-        var lines = attackers.Take(max).Select(a => Line(Name(a), a.Total, a.Skills)).ToList();
+        var lines = attackers.Take(max).Select((a, i) => Line(Name(a), a.Total, a.Skills, i < OpenAttackers)).ToList();
         if (attackers.Count > max)
         {
             var rest = attackers.Skip(max).ToList();
-            lines.Add(Line($"그 외 {rest.Count}명", rest.Sum(a => a.Total), []));
+            lines.Add(Line($"그 외 {rest.Count}명", rest.Sum(a => a.Total), [], false));
         }
         return lines;
     }
