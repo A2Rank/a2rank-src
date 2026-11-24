@@ -1,0 +1,29 @@
+<?xml version='1.0'?>
+<!-- Obfuscar settings for the shipped assemblies (build\release.ps1 runs them over build\publish before the packages are made).
+     Only the upload code (DataUploader, WindowUploader: the server address, the key and the way the data is sent) is obfuscated: the rest of the program,
+     and the Protocol, Capture and Core assemblies, stay readable on purpose. What the obfuscated part must keep: whatever is read or written by name. -->
+<Obfuscator>
+  <Var name="InPath" value="$(ObfuscarIn)" />
+  <Var name="OutPath" value="$(ObfuscarOut)" />
+  <Var name="KeepPublicApi" value="false" />
+  <Var name="HidePrivateApi" value="true" />
+  <Var name="RenameProperties" value="true" />
+  <Var name="RenameEvents" value="true" />
+  <Var name="RenameFields" value="true" />
+  <Var name="UseUnicodeNames" value="false" />
+  <Var name="HideStrings" value="true" />
+  <Var name="OptimizeMethods" value="true" />
+  <Var name="SuppressIldasm" value="true" />
+  <Var name="AnalyzeXaml" value="true" />
+  <Var name="ReuseNames" value="true" />
+
+  <Module file="$(InPath)\A2Rank.dll">
+    <SkipType name="*AnonymousType*" skipMethods="true" skipProperties="true" skipFields="true" skipEvents="true" />
+    <!-- the XAML binds to properties by name ({Binding Chips}): the screens' models keep their property names; their methods, fields and the logic stay renamed -->
+    <!-- everything of the app except the upload classes (and what is nested in them) keeps all its names -->
+    <SkipType rx="^Aion2Meter\.App\.(?!(DataUploader|WindowUploader)(/|$)).*" skipMethods="true" skipProperties="true" skipFields="true" skipEvents="true" />
+    <SkipType name="Aion2Meter.App.*" skipProperties="true" skipEvents="true" />
+    <!-- the settings file is read and written by property name -->
+    <SkipType name="Aion2Meter.App.AppSettings" skipMethods="true" skipProperties="true" skipFields="true" skipEvents="true" />
+  </Module>
+</Obfuscator>

@@ -1,0 +1,107 @@
+<Application x:Class="Aion2Meter.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <!-- Palette: slate panels, teal accent, orange for repeat kills. -->
+        <SolidColorBrush x:Key="PanelBaseBrush" Color="#FF0F141A" />
+        <!-- Replaced at run time with PanelBaseBrush at the chosen opacity. -->
+        <SolidColorBrush x:Key="PanelBrush" Color="#F70F141A" />
+        <SolidColorBrush x:Key="KillListPanelBrush" Color="#F70F141A" />
+        <SolidColorBrush x:Key="PanelEdgeBrush" Color="#2E5EEAD4" />
+        <SolidColorBrush x:Key="TileBrush" Color="#14FFFFFF" />
+        <SolidColorBrush x:Key="LineBrush" Color="#1FFFFFFF" />
+        <SolidColorBrush x:Key="TextBrush" Color="#FFF1F5F9" />
+        <SolidColorBrush x:Key="FaintBrush" Color="#FF94A3B8" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF2DD4BF" />
+        <SolidColorBrush x:Key="RepeatBrush" Color="#FFFB923C" />
+        <SolidColorBrush x:Key="RepeatTintBrush" Color="#1FFB923C" />
+        <SolidColorBrush x:Key="GainBrush" Color="#FF4ADE80" />
+        <SolidColorBrush x:Key="LossBrush" Color="#FFF87171" />
+        <SolidColorBrush x:Key="WaitBrush" Color="#FFFBBF24" />
+        <FontFamily x:Key="IconFont">Segoe MDL2 Assets</FontFamily>
+
+        <!-- Round icon button on the overlay. -->
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource FaintBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Box" Background="{TemplateBinding Background}" CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="#26FFFFFF" />
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Pill shown over the lock button while clicks pass through. -->
+        <Style x:Key="ReleaseButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#FF0F141A" />
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="12" Padding="8,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Small caption above a value in a tile. -->
+        <Style x:Key="Caption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{StaticResource FaintBrush}" />
+        </Style>
+        <Style x:Key="TileValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,1,0,0" />
+        </Style>
+        <!-- Slim scroll bar -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="MinWidth" Value="6" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border CornerRadius="3" Background="#40FFFFFF" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Application.Resources>
+</Application>

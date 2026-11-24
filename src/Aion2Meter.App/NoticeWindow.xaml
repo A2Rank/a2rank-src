@@ -1,0 +1,91 @@
+<Window x:Class="Aion2Meter.App.NoticeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="A2Rank 사용 전에 확인해 주세요" Width="500" SizeToContent="Height" MaxHeight="760"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" FontFamily="Malgun Gothic" FontSize="12.5"
+        Foreground="{StaticResource TextBrush}">
+    <Window.Resources>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource TileBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style x:Key="Note" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource FaintBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,3,0,0" />
+        </Style>
+        <Style x:Key="Point" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,7" />
+            <Setter Property="LineHeight" Value="19" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#26FFFFFF" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Box" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="#FF0F141A" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{StaticResource PanelBaseBrush}" BorderBrush="{StaticResource PanelEdgeBrush}" BorderThickness="1" CornerRadius="12">
+        <StackPanel Margin="20,16,20,18">
+            <TextBlock Text="A2Rank 사용 전에 확인해 주세요" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,10" MouseLeftButtonDown="OnTitleDrag" />
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Point}">
+                        <Run FontWeight="SemiBold" Text="비공식 프로그램입니다." />
+                        엔씨소프트와 관계가 없습니다.
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource Point}">
+                        <Run FontWeight="SemiBold" Text="패킷을 읽습니다." />
+                        게임 화면이나 파일은 건드리지 않고, 게임 서버와 주고받는 패킷을 내 PC에서 읽기만 합니다 (Npcap을 씁니다).
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource Point}">
+                        <Run FontWeight="SemiBold" Foreground="{StaticResource WaitBrush}" Text="불이익이 생길 수 있습니다." />
+                        게임 약관상 허용되지 않는 프로그램으로 볼 수 있고, 계정 제재 같은 불이익이 생길 수 있습니다. 이를 직접 확인하고 사용하는 것은 사용자의 책임입니다.
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource Point}" Margin="0">
+                        <Run FontWeight="SemiBold" Text="기본으로는 아무것도 보내지 않습니다." />
+                        서버로 가는 것은 설정에서 직접 동의하거나 누른 경우뿐이고, 기록은 이 PC에 저장됩니다.
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+            <TextBlock Style="{StaticResource Note}" Margin="0,0,0,10">
+                <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/TERMS.md" RequestNavigate="OnLink">이용 안내와 면책</Hyperlink>
+                ·
+                <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/PRIVACY.md" RequestNavigate="OnLink">개인정보 처리방침</Hyperlink>
+            </TextBlock>
+            <CheckBox x:Name="Understood" Content="위 내용을 이해했고, 이 프로그램을 사용하겠습니다" Click="OnChecked" Margin="0,0,0,12" Foreground="{StaticResource TextBrush}" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" x:Name="StartButton" Content="시작하기" Click="OnStart" IsEnabled="False" MinWidth="100" Style="{StaticResource AccentButton}" />
+                <Button Content="종료" Click="OnExit" HorizontalAlignment="Left" />
+            </DockPanel>
+        </StackPanel>
+    </Border>
+</Window>

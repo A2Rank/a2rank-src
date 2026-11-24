@@ -1,0 +1,17 @@
+# 실제 전투 패킷 기록: 다른 플레이어 이름 포함 - 저장소에 올리지 않음
+testdata/
+# 빌드 결과물
+bin/
+obj/
+*.user
+.vs/
+# 원본 앱 기반 수정판과 그 도구: 새 코드에 섞지 않음 (클린룸)
+build/publish/
+build/releases/
+build/release-notes.md
+build/obfuscar-mapping.txt
+build/obfuscar.run.xml
+build/obfuscate-in/
+build/obfuscate-out/
+build/github-stage/
+build/releases-aion2meter/

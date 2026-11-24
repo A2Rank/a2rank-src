@@ -1,0 +1,502 @@
+﻿<Window x:Class="Aion2Meter.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="A2Rank 설정" Width="560" Height="700"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen" FontFamily="Malgun Gothic" FontSize="12.5"
+        Foreground="{StaticResource TextBrush}">
+    <Window.Resources>
+        <!-- Section card and texts -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource TileBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style x:Key="Section" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style x:Key="Note" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource FaintBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,3,0,0" />
+        </Style>
+        <Style TargetType="Hyperlink">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        </Style>
+
+        <!-- Buttons: tile by default, accent for the main action -->
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#26FFFFFF" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Box" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="#FF0F141A" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Check box: rounded square with a check mark -->
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Margin" Value="0,3" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <Border x:Name="Box" Width="16" Height="16" CornerRadius="4" BorderThickness="1.5"
+                                    BorderBrush="{StaticResource FaintBrush}" Background="Transparent" VerticalAlignment="Center">
+                                <TextBlock x:Name="Mark" Text="&#xE73E;" FontFamily="{StaticResource IconFont}" FontSize="10"
+                                           Foreground="#FF0F141A" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Hidden" />
+                            </Border>
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Radio button: ring with an accent dot -->
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Margin" Value="0,3" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <Grid Width="16" Height="16" VerticalAlignment="Center">
+                                <Ellipse x:Name="Ring" Stroke="{StaticResource FaintBrush}" StrokeThickness="1.5" />
+                                <Ellipse x:Name="Dot" Width="8" Height="8" Fill="{StaticResource AccentBrush}" Visibility="Hidden" />
+                            </Grid>
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Text box used for recording shortcuts -->
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#33000000" />
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Box" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ScrollViewer x:Name="PART_ContentHost" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Slider: thin track with an accent part and a round thumb -->
+        <Style x:Key="SliderSide" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent">
+                            <Border Height="4" CornerRadius="2" Background="{TemplateBinding Background}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="Slider">
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource SliderSide}" Background="{StaticResource AccentBrush}" Command="Slider.DecreaseLarge" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource SliderSide}" Background="#33FFFFFF" Command="Slider.IncreaseLarge" />
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Ellipse Width="14" Height="14" Fill="{StaticResource TextBrush}" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Category tabs -->
+        <Style x:Key="TabButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Margin" Value="0,0,6,4" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Box" Background="#26FFFFFF" CornerRadius="14" Padding="14,5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="#FF0F141A" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{StaticResource PanelBaseBrush}" BorderBrush="{StaticResource PanelEdgeBrush}" BorderThickness="1" CornerRadius="12">
+        <DockPanel>
+            <!-- Title bar -->
+            <DockPanel DockPanel.Dock="Top" Margin="14,8,8,4" Background="Transparent" MouseLeftButtonDown="OnTitleDrag">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="&#xE897;" Style="{StaticResource IconButton}" Click="OnHelp" ToolTip="사용 설명서" />
+                    <Button Content="&#xE921;" Style="{StaticResource IconButton}" Click="OnMinimize" ToolTip="최소화" />
+                    <Button Content="&#xE711;" Style="{StaticResource IconButton}" Click="OnClose" ToolTip="닫기 (앱은 계속 실행)" />
+                </StackPanel>
+                <Ellipse Width="7" Height="7" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Text="설정" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <TextBlock x:Name="Version" DockPanel.Dock="Bottom" Style="{StaticResource Note}" Margin="16,0,16,12" />
+
+            <!-- Categories -->
+            <WrapPanel DockPanel.Dock="Top" Margin="14,2,14,2">
+                <RadioButton x:Name="TabMeasure" Content="측정" Tag="PageMeasure" IsChecked="True" Style="{StaticResource TabButton}" Checked="OnTab" />
+                <RadioButton Content="화면" Tag="PageScreen" Style="{StaticResource TabButton}" Checked="OnTab" />
+                <RadioButton Content="알림" Tag="PageBoss" Style="{StaticResource TabButton}" Checked="OnTab" />
+                <RadioButton Content="기록·데이터" Tag="PageData" Style="{StaticResource TabButton}" Checked="OnTab" />
+                <RadioButton Content="정보" Tag="PageInfo" Style="{StaticResource TabButton}" Checked="OnTab" />
+            </WrapPanel>
+
+            <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto" Margin="12,4,6,4" Padding="0,0,6,0">
+                <StackPanel>
+                        <StackPanel x:Name="PageMeasure">
+                    <!-- Measuring -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="측정" Style="{StaticResource Section}" />
+                            <DockPanel>
+                                <Button x:Name="MeasureButton" DockPanel.Dock="Right" Content="측정 시작" Click="OnMeasure" MinWidth="90"
+                                        Style="{StaticResource AccentButton}" />
+                                <TextBlock x:Name="CaptureStatus" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            </DockPanel>
+                            <TextBlock x:Name="NpcapLink" Style="{StaticResource Note}" Visibility="Collapsed">
+                                <Hyperlink NavigateUri="https://npcap.com/#download" RequestNavigate="OnLink">Npcap 내려받기 (npcap.com)</Hyperlink>
+                                — 설치 후 측정 시작을 누르세요.
+                            </TextBlock>
+                            <CheckBox x:Name="AutoStart" Content="실행하면 자동으로 측정 시작" Click="OnChanged" Margin="0,10,0,3" />
+                            <!-- Packet collection is switched on in the "데이터 보내기" window; these stay for the code but are hidden -->
+                            <CheckBox x:Name="Record" Content="원시 패킷 녹화 (문제 분석용, 다음 측정 시작부터)" Click="OnChanged" Visibility="Collapsed" />
+                            <DockPanel Margin="24,2,0,0" Visibility="Collapsed">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                    <Button Content="폴더 선택…" Click="OnRecordingFolder" />
+                                    <Button x:Name="RecordingDefaultButton" Content="기본 위치" Click="OnRecordingDefault" Margin="6,0,0,0" />
+                                </StackPanel>
+                                <TextBlock x:Name="RecordingFolderText" Style="{StaticResource Note}" TextWrapping="Wrap" Margin="0,3,8,0" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Period -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="집계 기준" Style="{StaticResource Section}" />
+                            <RadioButton x:Name="ModeRanking" Content="랭킹 초기화 시각에 맞추기" GroupName="Mode" Click="OnMode" />
+                            <RadioButton x:Name="ModeHour" Content="정각" GroupName="Mode" Click="OnMode" />
+                            <TextBlock x:Name="ModeNote" Style="{StaticResource Note}" />
+                            <TextBlock Text="처치 명단은 항상 정각에 새로 시작합니다." Style="{StaticResource Note}" />
+                        </StackPanel>
+                    </Border>
+
+                        </StackPanel>
+                        <StackPanel x:Name="PageScreen" Visibility="Collapsed">
+                    <!-- Overlay -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="표시창 배경 불투명도" Style="{StaticResource Section}" />
+                            <DockPanel>
+                                <TextBlock Text="평소" Width="90" VerticalAlignment="Center" />
+                                <TextBlock x:Name="OpacityText" DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                                <Slider x:Name="OpacitySlider" Minimum="20" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" ValueChanged="OnOpacity" />
+                            </DockPanel>
+                            <DockPanel Margin="0,6,0,0">
+                                <TextBlock Text="마우스 통과 중" Width="90" VerticalAlignment="Center" />
+                                <TextBlock x:Name="PassOpacityText" DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                                <Slider x:Name="PassOpacitySlider" Minimum="20" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" ValueChanged="OnOpacity" />
+                            </DockPanel>
+                            <TextBlock Text="표시창 배경에 적용됩니다. 글자는 그대로 보입니다. (처치 명단은 위 카드에서 따로 정합니다.)" Style="{StaticResource Note}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Kill list -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="처치 명단" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="ShowKillList" Content="처치 명단 창 표시" Click="OnChanged" />
+                            <CheckBox x:Name="DockKillList" Content="표시창 아래에 붙이기" Click="OnChanged" />
+                            <TextBlock Text="명단 창을 끌어서 옮기면 떨어집니다." Style="{StaticResource Note}" Margin="24,0,0,0" />
+                            <DockPanel Margin="0,8,0,0">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="−" Click="OnThresholdDown" Padding="10,2" />
+                                    <TextBlock x:Name="ThresholdText" Width="40" TextAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    <Button Content="+" Click="OnThresholdUp" Padding="10,2" />
+                                </StackPanel>
+                                <TextBlock Text="위에 고정하고 강조할 처치 횟수" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <TextBlock Text="명단 배경 불투명도" Style="{StaticResource Section}" Margin="0,14,0,4" />
+                            <DockPanel>
+                                <TextBlock Text="평소" Width="90" VerticalAlignment="Center" />
+                                <TextBlock x:Name="KillOpacityText" DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                                <Slider x:Name="KillOpacitySlider" Minimum="20" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" ValueChanged="OnKillListOpacity" />
+                            </DockPanel>
+                            <DockPanel Margin="0,6,0,0">
+                                <TextBlock Text="마우스 통과 중" Width="90" VerticalAlignment="Center" />
+                                <TextBlock x:Name="KillPassOpacityText" DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                                <Slider x:Name="KillPassOpacitySlider" Minimum="20" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" ValueChanged="OnKillListOpacity" />
+                            </DockPanel>
+                            <TextBlock Text="표시창과 따로 정합니다. 건드리기 전에는 표시창과 같은 값을 따라갑니다." Style="{StaticResource Note}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Shortcuts -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="단축키" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="Hotkeys" Content="전역 단축키 사용" Click="OnChanged" />
+                            <StackPanel x:Name="HotkeyRows" Margin="0,4,0,0" />
+                            <TextBlock Text="칸을 누르고 원하는 키 조합을 누르세요. Ctrl·Alt·Shift·Win 중 하나 이상과 함께 (F1~F12는 단독 가능), Esc는 취소."
+                                       Style="{StaticResource Note}" />
+                            <TextBlock x:Name="HotkeyNote" Style="{StaticResource Note}" Foreground="{StaticResource LossBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                        </StackPanel>
+                        <StackPanel x:Name="PageBoss" Visibility="Collapsed">
+                    <!-- Target alert -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="조준 알림" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="TargetAlert" Content="조준한 상대의 직업이 선택한 직업이면 짧은 알림음" Click="OnTargetChanged" />
+                            <TextBlock Text="알릴 직업 (여러 개 선택 가능)" Style="{StaticResource Note}" Margin="24,8,0,0" />
+                            <WrapPanel x:Name="TargetClassPanel" Margin="24,2,0,0" />
+                            <DockPanel Margin="24,6,0,0">
+                                <TextBlock Text="소리 크기" Width="70" VerticalAlignment="Center" />
+                                <TextBlock x:Name="TargetVolumeText" DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                                <Slider x:Name="TargetVolumeSlider" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" ValueChanged="OnTargetVolume" PreviewMouseLeftButtonUp="OnTargetVolumeDone" />
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="상대가 시야에 들어올 때 직업을 알아 두었다가, 그 상대를 조준하는 순간 알립니다. 앱을 켜기 전부터 보이던 상대는 직업을 몰라서 알리지 않습니다. 게임에 아무것도 보내지 않고 화면의 정보만 읽습니다." />
+                            <Button Content="알림음 듣기" Click="OnTargetTest" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <!-- Field boss alerts -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="필드보스 알림" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="BossAlerts" Content="필드보스 알림" Click="OnBossChanged" />
+                            <CheckBox x:Name="BossKaira" Content="감시자 카이라 (매일 1·9·13·21시)" Click="OnBossChanged" Margin="24,3,0,3" />
+                            <CheckBox x:Name="BossAgro" Content="정령왕 아그로 (매일 9·21시)" Click="OnBossChanged" Margin="24,3,0,3" />
+                            <TextBlock Text="몇 분 전에 알릴까요 (여러 개 선택 가능)" Style="{StaticResource Note}" Margin="24,8,0,0" />
+                            <StackPanel Orientation="Horizontal" Margin="24,2,0,0">
+                                <CheckBox x:Name="Boss10" Content="10분 전" Click="OnBossChanged" Margin="0,3,16,3" />
+                                <CheckBox x:Name="Boss5" Content="5분 전" Click="OnBossChanged" Margin="0,3,16,3" />
+                                <CheckBox x:Name="Boss1" Content="1분 전" Click="OnBossChanged" Margin="0,3,0,3" />
+                            </StackPanel>
+                            <CheckBox x:Name="BossSound" Content="알림 소리" Click="OnBossChanged" Margin="24,3,0,3" />
+                            <DockPanel Margin="24,6,0,0">
+                                <TextBlock Text="소리 크기" Width="70" VerticalAlignment="Center" />
+                                <TextBlock x:Name="BossVolumeText" DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                                <Slider x:Name="BossVolumeSlider" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" ValueChanged="OnBossVolume" PreviewMouseLeftButtonUp="OnBossVolumeDone" />
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource Note}" Text="알림은 메인 표시창 위쪽에 5초 동안 뜨고(누르면 바로 닫힙니다) 앱의 알림 소리가 납니다. 1분 전 알림은 소리가 두 번 납니다. 표시창을 숨겨 두면 트레이 알림으로 나옵니다." />
+                            <Button Content="알림 시험" Click="OnBossTest" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="다음 등장" Style="{StaticResource Section}" />
+                            <TextBlock x:Name="BossNext" TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource Note}" Text="두 보스 모두 정해진 시각(게임 시간)으로 계산합니다." />
+                        </StackPanel>
+                    </Border>
+
+                        </StackPanel>
+                        <StackPanel x:Name="PageData" Visibility="Collapsed">
+                    <!-- Data sending -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="데이터 보내기" Style="{StaticResource Section}" />
+                            <Button Content="데이터 보내기…" Click="OnSendData" HorizontalAlignment="Left" Margin="0,2,0,2" />
+                            <TextBlock Style="{StaticResource Note}">
+                                스킬 이름을 맞추는 데 쓸 패킷 녹화와 전투 분석기 캡처를 보냅니다. <Hyperlink Click="OnHelpData">자세한 설명</Hyperlink>
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource Note}">
+                                <Hyperlink Click="OnOpenFolder">앱 데이터 폴더 열기</Hyperlink>
+                                 · <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/PRIVACY.md" RequestNavigate="OnLink">개인정보 처리방침</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Window records: the finished hours of the ranking clock, sent to the collection server only with consent -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="구간 기록 보내기" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="UploadWindows" Content="내 구간 기록을 서버로 보내는 데 동의합니다" Click="OnUploadWindows" />
+                            <TextBlock Style="{StaticResource Note}"
+                                       Text="랭킹 초기화 시각 기준으로 한 시간이 끝날 때마다 포인트 변화(시작·끝 총 포인트, 획득·손실, 파티 인원별 합계)와 처치·사망 기록(시각, 종류, 포인트, 상대의 서버)을 내 캐릭터 이름·서버와 함께 보냅니다. 상대 이름은 보내지 않고 이 PC에만 남습니다. 변화가 없던 구간은 보내지 않습니다." />
+                            <TextBlock Style="{StaticResource Note}"
+                                       Text="서버의 기록은 보낸 이 설치(앱)만 읽을 수 있고, 캐릭터 이름과 서버만으로는 조회되지 않습니다. 나중에 랭킹이나 웹사이트에 보여 주게 되면 그 전에 다시 알리고 동의를 받습니다. 동의하지 않아도 다른 기능은 그대로 쓸 수 있고, 언제든 끄고 보낸 기록을 지울 수 있습니다." />
+                            <TextBlock Style="{StaticResource Note}">
+                                <Hyperlink Click="OnHelpWindows">자세한 설명 (사용 설명서)</Hyperlink>
+                                 · <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/PRIVACY.md" RequestNavigate="OnLink">개인정보 처리방침</Hyperlink> · <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/TERMS.md" RequestNavigate="OnLink">이용 안내</Hyperlink>
+                            </TextBlock>
+                            <TextBlock x:Name="UploadStatus" Style="{StaticResource Note}" Foreground="{StaticResource AccentBrush}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="내 기록 보기" Click="OnShowRecords" Style="{StaticResource AccentButton}"
+                                        ToolTip="서버에 저장된 구간 기록과 처치·사망 (메인 창의 시계 아이콘과 같습니다)" />
+                                <Button x:Name="ForgetButton" Content="보낸 기록 삭제…" Click="OnForgetWindows" Margin="6,0,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- How long the other players' names stay on this PC -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="내 PC의 기록 보관" Style="{StaticResource Section}" />
+                            <TextBlock Style="{StaticResource Note}" Margin="0,0,0,6"
+                                       Text="내 기록 창에 보이는 구간 기록과 처치·사망(상대 이름, 피해 상세)은 이 PC에 저장됩니다. 서버에는 최근 7일치만 있고, 이 PC의 기록은 아래에서 고른 기간 동안 남습니다." />
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="Keep7" GroupName="Keep" Content="7일" Margin="0,0,16,0" Click="OnKeepDays" />
+                                <RadioButton x:Name="Keep30" GroupName="Keep" Content="30일" Margin="0,0,16,0" Click="OnKeepDays" />
+                                <RadioButton x:Name="KeepForever" GroupName="Keep" Content="계속 (기본)" Click="OnKeepDays" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource Note}"
+                                       Text="7일이나 30일을 고르면 그 기간이 지난 처치 기록과 구간 사본(상대 이름 포함)을 지웁니다. 계속 보관해도 처치 기록이 15만 건을 넘으면 오래된 것부터 지웁니다. 포인트 합계 기록에는 이름이 없습니다." />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Records -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="기록 파일" Style="{StaticResource Section}" />
+                            <TextBlock x:Name="RecordFolderText" TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="폴더 선택…" Click="OnRecordFolder" />
+                                <Button x:Name="RecordOpenButton" Content="폴더 열기" Click="OnOpenRecordFolder" Margin="6,0,0,0"
+                                        ToolTip="기록 파일이 저장되는 폴더를 엽니다" />
+                                <Button x:Name="RecordOffButton" Content="저장 끄기" Click="OnRecordOff" Margin="6,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="폴더를 고르면 그때부터, 포인트가 오르내린 구간이 끝날 때마다 캐릭터·날짜별 CSV 파일(랭킹포인트_…)에 한 줄씩 추가합니다. 처치·사망·결투는 따로 처치사망_… 파일에 상대 이름과 함께 남습니다."
+                                       Style="{StaticResource Note}" />
+                        </StackPanel>
+                    </Border>
+
+                        </StackPanel>
+                        <StackPanel x:Name="PageInfo" Visibility="Collapsed">
+                    <!-- Updates -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="업데이트" Style="{StaticResource Section}" />
+                            <DockPanel>
+                                <Button x:Name="UpdateButton" DockPanel.Dock="Right" Content="업데이트 확인" Click="OnCheckUpdate" MinWidth="90"
+                                        Style="{StaticResource AccentButton}" />
+                                <TextBlock x:Name="UpdateStatus" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            </DockPanel>
+                            <CheckBox x:Name="AutoUpdate" Content="자동 업데이트 (실행할 때와 6시간마다 확인해서 내려받기)" Click="OnChanged" Margin="0,10,0,3" />
+                            <TextBlock Text="내려받은 새 버전은 [적용하고 다시 시작]을 누르거나 앱을 종료할 때 적용됩니다. 측정 중에는 저절로 다시 시작하지 않습니다."
+                                       Style="{StaticResource Note}" />
+                            <TextBlock x:Name="NewNotesText" Style="{StaticResource Note}" Visibility="Collapsed">
+                                <Hyperlink Click="OnShowNewNotes">새 버전의 변경 내용 보기</Hyperlink>
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource Note}">
+                                <Hyperlink Click="OnShowChanges">변경 내역 보기</Hyperlink>
+                                 · <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/PRIVACY.md" RequestNavigate="OnLink">개인정보 처리방침</Hyperlink> · <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/TERMS.md" RequestNavigate="OnLink">이용 안내</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Contact -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="문의" Style="{StaticResource Section}" />
+                            <TextBlock Text="오류, 제안, 보낸 데이터 삭제 요청을 앱에서 바로 보낼 수 있습니다. 메일로도 받습니다."
+                                       Style="{StaticResource Note}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="문의하기…" Click="OnContact" ToolTip="문의를 서버로 보냅니다" />
+                                <TextBlock x:Name="ContactText" Text="arank8934@gmail.com" VerticalAlignment="Center" Margin="10,0,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                        </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</Window>

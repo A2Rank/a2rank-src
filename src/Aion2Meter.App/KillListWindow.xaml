@@ -1,0 +1,125 @@
+﻿<Window x:Class="Aion2Meter.App.KillListWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="처치 명단" MinWidth="380" MinHeight="140"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="CanResizeWithGrip" Topmost="True" ShowInTaskbar="False" ShowActivated="False"
+        FontFamily="Malgun Gothic" Foreground="{StaticResource TextBrush}">
+    <Window.Resources>
+        <!-- One list line: count badge, name and server, points and time; click it to open the detail window -->
+        <DataTemplate x:Key="RowTemplate">
+            <Border Background="{Binding RowBackground}" CornerRadius="6" Margin="0,1" Padding="0,3,8,3">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{Binding AccentBar}" CornerRadius="1.5" Margin="0,1" />
+                        <Border Grid.Column="1" Width="20" Height="20" CornerRadius="10" Margin="7,0,0,0"
+                                Background="{Binding BadgeBackground}" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Count}" Foreground="{Binding BadgeForeground}" FontSize="10" FontWeight="Bold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="2" Margin="8,0,6,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" Foreground="{Binding NameColor}" FontSize="11.5" FontWeight="{Binding Weight}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Server}" Style="{StaticResource Caption}" FontSize="9.5" />
+                            <!-- Damage I did to this player / they did to me over the fights up to the kills (only when seen) -->
+                            <WrapPanel Visibility="{Binding DamageVisibility}" ToolTip="{Binding DamageTip}">
+                                <TextBlock Text="{Binding DamageDealt}" Foreground="{StaticResource AccentBrush}" FontSize="9.5" />
+                                <TextBlock Text="{Binding DamageReceived}" Foreground="{StaticResource LossBrush}" FontSize="9.5" />
+                                <TextBlock Text="{Binding Chevron}" FontFamily="{StaticResource IconFont}" FontSize="8" Margin="5,2,0,0"
+                                           Foreground="{StaticResource FaintBrush}" VerticalAlignment="Center" />
+                            </WrapPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Points}" Foreground="{Binding PointsColor}" FontSize="11" FontWeight="SemiBold"
+                                       HorizontalAlignment="Right" />
+                            <TextBlock Text="{Binding PointsSplit}" Style="{StaticResource Caption}" FontSize="9" HorizontalAlignment="Right"
+                                       Visibility="{Binding PointsSplitVisibility}" ToolTip="처치마다 받은 포인트" />
+                            <TextBlock Text="{Binding Time}" Style="{StaticResource Caption}" FontSize="9.5" HorizontalAlignment="Right" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+        <Style x:Key="GroupLabel" TargetType="TextBlock" BasedOn="{StaticResource Caption}">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="2,8,0,3" />
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{DynamicResource KillListPanelBrush}" BorderBrush="{StaticResource PanelEdgeBrush}" BorderThickness="1"
+            CornerRadius="12" Padding="10,8,10,14"
+            PreviewMouseLeftButtonDown="OnPress" PreviewMouseMove="OnMove" PreviewMouseLeftButtonUp="OnRelease">
+        <DockPanel>
+            <!-- Header -->
+            <DockPanel DockPanel.Dock="Top" Margin="2,0,0,0">
+                <Border DockPanel.Dock="Right" Background="{StaticResource TileBrush}" CornerRadius="9" Padding="8,1" VerticalAlignment="Center">
+                    <TextBlock x:Name="HourText" Style="{StaticResource Caption}" />
+                </Border>
+                <TextBlock Text="&#xE8FD;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource AccentBrush}"
+                           VerticalAlignment="Center" Margin="0,0,7,0" />
+                <TextBlock Text="처치 명단" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <!-- Hour summary -->
+            <UniformGrid DockPanel.Dock="Top" Columns="3" Margin="-3,8,-3,0">
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="7,3" Margin="3">
+                    <StackPanel>
+                        <TextBlock Text="처치" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="KillCount" FontSize="11.5" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="7,3" Margin="3">
+                    <StackPanel>
+                        <TextBlock Text="이름 확인 불가" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="UnknownCount" FontSize="11.5" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="7,3" Margin="3">
+                    <StackPanel>
+                        <TextBlock Text="사망" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="DeathCount" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource LossBrush}" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Two lists side by side: who I killed (wider) and who killed me -->
+            <Grid Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*" MinWidth="190" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="2*" MinWidth="150" />
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Column="0">
+                    <TextBlock x:Name="Empty" DockPanel.Dock="Top" Text="이번 시간 처치 기록이 아직 없습니다." Style="{StaticResource Caption}"
+                               FontSize="10.5" Margin="2,10,2,0" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock x:Name="PinnedLabel" Style="{StaticResource GroupLabel}" Foreground="{StaticResource RepeatBrush}" />
+                            <ItemsControl x:Name="PinnedRows" ItemTemplate="{StaticResource RowTemplate}" />
+                            <TextBlock x:Name="OtherLabel" Text="최근 처치" Style="{StaticResource GroupLabel}" />
+                            <ItemsControl x:Name="OtherRows" ItemTemplate="{StaticResource RowTemplate}" />
+                            <TextBlock x:Name="OtherMore" Style="{StaticResource GroupLabel}" Visibility="Collapsed" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+
+                <Border Grid.Column="1" Width="1" Margin="8,6,8,0" Background="{StaticResource LineBrush}" />
+
+                <DockPanel Grid.Column="2">
+                    <TextBlock x:Name="DeathLabel" DockPanel.Dock="Top" Text="사망" Style="{StaticResource GroupLabel}" Foreground="{StaticResource LossBrush}" />
+                    <TextBlock x:Name="DeathEmpty" DockPanel.Dock="Top" Text="사망 기록 없음" Style="{StaticResource Caption}" FontSize="10.5" Margin="2,2,2,0" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="DeathRows" ItemTemplate="{StaticResource RowTemplate}" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Grid>
+        </DockPanel>
+    </Border>
+</Window>

@@ -1,0 +1,100 @@
+<Window x:Class="Aion2Meter.App.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="A2Rank" Width="304" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False" ShowActivated="False"
+        FontFamily="Malgun Gothic" Foreground="{StaticResource TextBrush}">
+    <Border Background="{DynamicResource PanelBrush}" BorderBrush="{StaticResource PanelEdgeBrush}" BorderThickness="1"
+            CornerRadius="12" Padding="12,8,8,12" MouseLeftButtonDown="OnDrag">
+        <StackPanel>
+            <!-- Header: status dot, character, icon buttons -->
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="PassButton" Content="&#xE72E;" Style="{StaticResource IconButton}" Click="OnPass"
+                            ToolTip="마우스 통과: 클릭이 게임으로 갑니다" />
+                    <Button x:Name="SettingsButton" Content="&#xE713;" Style="{StaticResource IconButton}" Click="OnSettings" ToolTip="설정" />
+                    <Button x:Name="ExitButton" Content="&#xE711;" Style="{StaticResource IconButton}" Click="OnExit" ToolTip="종료" />
+                </StackPanel>
+                <Border x:Name="PartyChip" ToolTipService.InitialShowDelay="150" ToolTipService.ShowDuration="60000" DockPanel.Dock="Right" Background="{StaticResource TileBrush}" CornerRadius="8" Padding="6,1" Margin="4,0,2,0"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+                    <TextBlock x:Name="PartyText" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                </Border>
+                <Ellipse x:Name="StatusDot" Width="7" Height="7" Fill="{StaticResource FaintBrush}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                <TextBlock x:Name="CharacterText" Text="랭킹 포인트" FontSize="12" FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <!-- Field boss alert: shown for five seconds after it fires; a click hides it -->
+            <Border x:Name="BossBanner" Visibility="Collapsed" Background="{StaticResource AccentBrush}" CornerRadius="6" Padding="8,4" Margin="0,8,4,0"
+                    Cursor="Hand" MouseLeftButtonUp="OnBossBannerClick" ToolTip="누르면 닫습니다">
+                <TextBlock x:Name="BossBannerText" FontSize="12" FontWeight="SemiBold" Foreground="#FF0F141A" TextWrapping="Wrap" />
+            </Border>
+
+            <!-- This period -->
+            <Grid Margin="0,8,4,0">
+                <TextBlock x:Name="Period" Style="{StaticResource Caption}" VerticalAlignment="Bottom" />
+                <TextBlock x:Name="Remaining" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+            </Grid>
+            <TextBlock x:Name="Net" Text="0" FontSize="34" FontWeight="Bold" Margin="0,0,4,0" />
+            <Grid x:Name="ProgressTrack" Height="3" Margin="0,2,4,0">
+                <Border Background="{StaticResource TileBrush}" CornerRadius="1.5" />
+                <Border x:Name="ProgressFill" Background="{StaticResource AccentBrush}" CornerRadius="1.5" HorizontalAlignment="Left" Width="0" />
+            </Grid>
+
+            <!-- Tiles -->
+            <UniformGrid Columns="2" Margin="-3,8,1,0">
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="8,5" Margin="3">
+                    <StackPanel>
+                        <TextBlock Text="획득" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="Gain" Style="{StaticResource TileValue}" Foreground="{StaticResource GainBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="8,5" Margin="3">
+                    <StackPanel>
+                        <TextBlock Text="손실" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="Loss" Style="{StaticResource TileValue}" Foreground="{StaticResource LossBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="8,5" Margin="3">
+                    <StackPanel>
+                        <TextBlock x:Name="PreviousCaption" Text="직전 구간" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="Previous" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="8,5" Margin="3">
+                    <StackPanel>
+                        <TextBlock Text="오늘 누적" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="Today" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="8,5" Margin="3">
+                    <StackPanel>
+                        <TextBlock Text="ALL 랭킹" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="AllRank" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource TileBrush}" CornerRadius="6" Padding="8,5" Margin="3">
+                    <StackPanel>
+                        <TextBlock Text="직업 랭킹" Style="{StaticResource Caption}" />
+                        <TextBlock x:Name="ClassRank" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Footer -->
+            <DockPanel Margin="0,7,0,0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button x:Name="RecordsButton" Content="&#xE81C;" Style="{StaticResource IconButton}" Click="OnRecords"
+                            ToolTip="내 기록: 서버에 저장된 구간 기록과 처치·사망 (나만 볼 수 있음)" />
+                    <Button x:Name="KillListButton" Content="&#xE8FD;" Style="{StaticResource IconButton}"
+                            Click="OnKillList" ToolTip="처치 명단 창 보이기/숨기기" />
+                </StackPanel>
+                <StackPanel VerticalAlignment="Bottom">
+                    <TextBlock x:Name="Total" FontSize="11" />
+                    <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="0,2,4,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </StackPanel>
+    </Border>
+</Window>

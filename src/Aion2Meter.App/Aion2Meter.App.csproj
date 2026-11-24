@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aion2Meter.Capture\Aion2Meter.Capture.csproj" />
+    <ProjectReference Include="..\Aion2Meter.Core\Aion2Meter.Core.csproj" />
+    <ProjectReference Include="..\Aion2Meter.Protocol\Aion2Meter.Protocol.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- Only for the tray icon (NotifyIcon); WPF has none. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>A2Rank</AssemblyName>
+    <Version>0.2.26</Version>
+    <StartupObject>Aion2Meter.App.Program</StartupObject>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Keep WPF names (Application, MessageBox, ...) unambiguous. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The same icon file is the exe icon (ApplicationIcon) and the tray icon (TrayIcon.cs). -->
+    <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
+    <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The change history shown after an update (Controller.AllChanges). -->
+    <EmbeddedResource Include="..\..\docs\CHANGELOG.md" LogicalName="changelog" />
+    <!-- The user manual shown from the settings window and the tray menu (ManualWindow). -->
+    <EmbeddedResource Include="..\..\docs\MANUAL.md" LogicalName="manual" />
+    <!-- Update trust: our signing public key (SecureDownloader.cs). -->
+    <EmbeddedResource Include="update-public-key.txt" LogicalName="update-public-key" />
+    <!-- Data collection server (DataUploader.cs): certificate pin and the key header. Empty until the server is set up. -->
+    <EmbeddedResource Include="upload-server-pin.txt" LogicalName="upload-server-pin" />
+    <EmbeddedResource Include="upload-key.txt" LogicalName="upload-key" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Example combat-log capture shown in the "데이터 보내기" help (names are covered). -->
+    <Resource Include="help-analyzer.png" />
+    <Resource Include="help-combatlog.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+
+</Project>

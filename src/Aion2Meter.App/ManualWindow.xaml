@@ -1,0 +1,72 @@
+<Window x:Class="Aion2Meter.App.ManualWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="사용 설명서" Width="760" Height="640" MinWidth="520" MinHeight="320"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterScreen" FontFamily="Malgun Gothic" FontSize="12.5"
+        Foreground="{StaticResource TextBrush}">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#26FFFFFF" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Box" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- A table-of-contents line: plain text that lights up under the mouse -->
+        <Style x:Key="TocButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Box" Background="{TemplateBinding Background}" CornerRadius="6" Padding="10,5">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="#26FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{StaticResource PanelBaseBrush}" BorderBrush="{StaticResource PanelEdgeBrush}" BorderThickness="1" CornerRadius="12">
+        <DockPanel>
+            <!-- Title bar -->
+            <DockPanel DockPanel.Dock="Top" Margin="16,12,12,6" Background="Transparent" MouseLeftButtonDown="OnTitleDrag">
+                <Button DockPanel.Dock="Right" Content="닫기" Click="OnClose" />
+                <TextBlock Text="&#xE897;" FontFamily="{StaticResource IconFont}" FontSize="13" Foreground="{StaticResource AccentBrush}"
+                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock x:Name="TitleText" Text="사용 설명서" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <!-- Table of contents -->
+            <ScrollViewer DockPanel.Dock="Left" Width="176" VerticalScrollBarVisibility="Auto" Margin="10,0,0,12">
+                <StackPanel x:Name="Toc" />
+            </ScrollViewer>
+
+            <!-- The manual -->
+            <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto" Margin="8,0,8,12" Padding="0,0,8,0">
+                <StackPanel x:Name="Content" />
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</Window>
