@@ -10,6 +10,8 @@ public sealed class AppSettings
     public ResetMode ResetMode { get; set; } = ResetMode.RankingReset;
     public int PinThreshold { get; set; } = 3;
     public bool AutoStart { get; set; } = true;
+    /// <summary>Start with Windows (a value under HKCU...Run for this user; off by default).</summary>
+    public bool RunAtLogin { get; set; }
     /// <summary>Field boss alerts (10 and 5 minutes before): master switch, each boss, sound; and the next 정령왕 아그로 spawn we know (epoch ms).</summary>
     public bool BossAlerts { get; set; } = true;
     public bool BossKaira { get; set; } = true;
@@ -38,6 +40,10 @@ public sealed class AppSettings
     public bool ShowKillList { get; set; } = true;
     /// <summary>The overlay, the kill list, the live fight window and the detail windows stay above all other windows (off: they are ordinary windows that other windows, also the game, can cover).</summary>
     public bool AlwaysOnTop { get; set; } = true;
+    /// <summary>The meter windows show only while the game window (or one of the app's own) is the one in front; they hide while another program is.</summary>
+    public bool OnlyWithGame { get; set; }
+    /// <summary>Light mode (the default; off = "성능 모드" in the settings): the app yields to the game (lower priority), redraws its windows less often, lists at most 5 in the live fight window (packet recording is its own setting). Off: as it was.</summary>
+    public bool LightMode { get; set; } = true;
     /// <summary>The main window also shows how many points are left to a goal rank, in ALL and/or in my class (each on its own; both off: the main window is as it was).</summary>
     public bool ShowAllGoal { get; set; }
     public int GoalAllRank { get; set; } = 100;
@@ -84,7 +90,7 @@ public sealed class AppSettings
     /// <summary>The live fight window (실시간 전투): shown, order (0 total, 1 dealt, 2 received), lines listed, place and size.</summary>
     public bool ShowLive { get; set; }
     public int LiveSort { get; set; }
-    public int LiveRows { get; set; } = 10;
+    public int LiveRows { get; set; } = 5;
     public double? LiveLeft { get; set; }
     public double? LiveTop { get; set; }
     public double LiveWidth { get; set; } = 330;

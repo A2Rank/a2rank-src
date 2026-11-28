@@ -51,11 +51,14 @@ public sealed class Controller : IDisposable
         Session.WindowClosed += OnWindowClosed;
         _capture.Events += events =>
         {
+            Perf.CaptureThread();
+            long began = System.Diagnostics.Stopwatch.GetTimestamp();
             foreach (var e in events)
             {
                 _queue.Enqueue(e);
                 if (e is MessageEvent { Message: var m } && _targets.Observe(m, e.Time) is { } who) OnTargeted(who);   // at once, not in the 100 ms timer
             }
+            Perf.Note("capture callback", began, 20, events.Count);
         };
         _overlay = new OverlayWindow(this);
         _killList = new KillListWindow { Width = Settings.KillListWidth, Height = Settings.KillListHeight };
@@ -125,15 +128,20 @@ public sealed class Controller : IDisposable
         HookCharacterInfoPlace();
         _overlay.Show();
         ApplyTopmost();
+        ApplyPerformance();
+        if (Environment.GetEnvironmentVariable("A2RANK_DATA") is not { Length: > 0 }) Startup.Apply(Settings.RunAtLogin);   // after an update the entry points at the new exe
         UpdateKillListVisibility();
         UpdateLiveVisibility();
 
         _pump.Tick += (_, _) => Pump();
+        _focusTimer.Tick += (_, _) => CheckGameFocus();
+        _focusTimer.Start();
         _clock.Tick += (_, _) =>
         {
             if (PreviewNow is not null) { _dirty = true; return; }   // a replayed recording stays as it ended
             Session.Tick(DateTimeOffset.Now);
             _capture.Tick();
+            Perf.Sample();
             CheckBossAlerts(DateTimeOffset.Now);
             ExportRecords();
             if (++_recordingTicks % 15 == 0) KeepRecordingsSmall();
@@ -231,7 +239,42 @@ public sealed class Controller : IDisposable
     public void ToggleOverlay()
     {
         _overlayVisible = !_overlayVisible;
-        if (_overlayVisible)
+        ApplyOverlayVisibility();
+    }
+
+    // ---- only with the game: the meter windows hide while another program is in front
+
+    private readonly DispatcherTimer _focusTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private bool _focusHidden;
+    private long _gamePidsAt;
+    private HashSet<uint> _gamePids = [];
+
+    /// <summary>The meter windows are shown: not switched off by the user (hotkey) and not hidden because another program is in front.</summary>
+    private bool ShowOverlays => _overlayVisible && !_focusHidden;
+
+    /// <summary>Called twice a second and when the setting changes: with "게임 창이 맨 앞일 때만 표시" the windows hide whenever the game is not in front (also when it is not running); only the game or one of this app's own windows keeps them shown. The tray icon still opens the settings.</summary>
+    private void CheckGameFocus()
+    {
+        bool hide = false;
+        if (Settings.OnlyWithGame)
+        {
+            long now = Environment.TickCount64;
+            if (now - _gamePidsAt > 2000)
+            {
+                _gamePidsAt = now;
+                _gamePids = [.. System.Diagnostics.Process.GetProcessesByName("Aion2").Select(p => (uint)p.Id)];
+            }
+            uint front = Native.ForegroundProcess();
+            hide = front != 0 && !_gamePids.Contains(front) && front != (uint)Environment.ProcessId;
+        }
+        if (hide == _focusHidden) return;
+        _focusHidden = hide;
+        ApplyOverlayVisibility();
+    }
+
+    private void ApplyOverlayVisibility()
+    {
+        if (ShowOverlays)
         {
             _overlay.Show();
             SetPassthrough(_passthrough);
@@ -306,6 +349,33 @@ public sealed class Controller : IDisposable
     done:
         PreviewNow = last;
         _dirty = true;
+    }
+
+    /// <summary>
+    /// Development (--stress file.pcap [speed]): plays a recording into the capture path (the same one the network uses: reassembly, recording, events, the windows) at its own pace,
+    /// to see what a crowd costs in processor time; use with A2RANK_DATA and no automatic measuring. The recording is played over and over until the app is closed.
+    /// </summary>
+    public void StressRecording(string path, double speed)
+    {
+        var frames = Aion2Meter.Capture.PcapReader.Read(path).ToList();
+        if (frames.Count == 0) return;
+        Session.Start(frames[0].Time);
+        Task.Run(() =>
+        {
+            while (!_disposed)
+            {
+                var began = System.Diagnostics.Stopwatch.GetTimestamp();
+                var first = frames[0].Time;
+                foreach (var f in frames)
+                {
+                    if (_disposed) return;
+                    var due = (f.Time - first) / speed;
+                    var wait = due - System.Diagnostics.Stopwatch.GetElapsedTime(began);
+                    if (wait > TimeSpan.FromMilliseconds(2)) Thread.Sleep(wait);
+                    _capture.Handle(f.Data, f.LinkType, f.Time);
+                }
+            }
+        });
     }
 
     public string? RecordError { get; private set; }
@@ -628,6 +698,9 @@ public sealed class Controller : IDisposable
     public void SettingsChanged()
     {
         ApplyTopmost();
+        CheckGameFocus();
+        ApplyPerformance();
+        if (Environment.GetEnvironmentVariable("A2RANK_DATA") is not { Length: > 0 }) Startup.Apply(Settings.RunAtLogin);   // (a development copy with its own data folder leaves the entry alone)
         Session.Kills.Threshold = Settings.PinThreshold;
         UpdateKillListVisibility();
         UpdateLiveVisibility();
@@ -649,6 +722,7 @@ public sealed class Controller : IDisposable
         _updateTimer.Stop();
         _windowTimer.Stop();
         _pump.Stop();
+        _focusTimer.Stop();
         _clock.Stop();
         _capture.Dispose();
         Pump();
@@ -667,8 +741,11 @@ public sealed class Controller : IDisposable
 
     private void Pump()
     {
+        long began = System.Diagnostics.Stopwatch.GetTimestamp();
+        int handled = 0;
         while (_queue.TryDequeue(out var e))
         {
+            handled++;
             try
             {
                 Session.Handle(e);
@@ -679,18 +756,42 @@ public sealed class Controller : IDisposable
                 Log.Write("event: " + ex);
             }
         }
-        if (_dirty) Refresh();
+        long handledAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        Perf.Note("handling events", began, 30, handled);
+        if (_dirty && Environment.TickCount64 - _refreshedAt >= RefreshGapMs) { _refreshedAt = Environment.TickCount64; Refresh(); }   // a crowd keeps it dirty all the time: at most one redraw per gap
+        Perf.Note("refresh", handledAt, 30, 0);
+    }
+
+    private string? _trayText;
+    private long _refreshedAt;
+    /// <summary>How often the windows are redrawn at most: 10 times a second normally, 2 in light mode.</summary>
+    private int RefreshGapMs => Settings.LightMode ? 500 : 100;
+    private static readonly System.Diagnostics.Process Me = System.Diagnostics.Process.GetCurrentProcess();
+
+    /// <summary>Light mode: the game comes first, so this app runs below normal priority; otherwise normal.</summary>
+    private void ApplyPerformance()
+    {
+        try { Me.PriorityClass = Settings.LightMode ? System.Diagnostics.ProcessPriorityClass.BelowNormal : System.Diagnostics.ProcessPriorityClass.Normal; }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        _live.Gap = Settings.LightMode ? 1000 : 500;
     }
 
     private void Refresh(bool force = false)
     {
         _dirty = false;
         var now = PreviewNow ?? DateTimeOffset.Now;
+        long t = System.Diagnostics.Stopwatch.GetTimestamp();
         _overlay.Display(Session, now, StatusText(now), StatusBrush(now));
+        Perf.Note("refresh: main window", t, 15, 0); t = System.Diagnostics.Stopwatch.GetTimestamp();
         _killList.Display(PreviewKills ?? Session.Kills);
-        if (Settings.ShowLive && _overlayVisible) _live.Display(Session.Matcher.Live(now), (LiveSort)Math.Clamp(Settings.LiveSort, 0, 2), Math.Clamp(Settings.LiveRows, 3, 40), force);
+        Perf.Note("refresh: kill list", t, 15, 0); t = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (Settings.ShowLive && ShowOverlays && (force || _live.Due)) _live.Display(Session.Matcher.Live(now), (LiveSort)Math.Clamp(Settings.LiveSort, 0, 2), Settings.LightMode ? Math.Min(5, Math.Clamp(Settings.LiveRows, 3, 40)) : Math.Clamp(Settings.LiveRows, 3, 40), force);
+        Perf.Note("refresh: live window", t, 15, 0); t = System.Diagnostics.Stopwatch.GetTimestamp();
         if (_settingsWindow?.IsVisible == true) _settingsWindow.Refresh(now);
-        if (_tray is not null) _tray.Text = $"A2Rank · 이번 구간 {Fmt.Signed(Session.Buckets.Current?.Net ?? 0)}";
+        Perf.Note("refresh: settings", t, 15, 0); t = System.Diagnostics.Stopwatch.GetTimestamp();
+        // (the tray text only when it changed: each assignment is a call to the shell)
+        if (_tray is not null && $"A2Rank · 이번 구간 {Fmt.Signed(Session.Buckets.Current?.Net ?? 0)}" is var text && text != _trayText) _tray.Text = _trayText = text;
+        Perf.Note("refresh: tray", t, 15, 0);
     }
 
     /// <summary>Under the overlay while docked, otherwise where the user left it.</summary>
@@ -711,7 +812,7 @@ public sealed class Controller : IDisposable
     private void UpdateKillListVisibility()
     {
         _overlay.SetKillListShown(Settings.ShowKillList);
-        if (Settings.ShowKillList && _overlayVisible)
+        if (Settings.ShowKillList && ShowOverlays)
         {
             _killList.Show();
             PlaceKillList();
@@ -723,7 +824,7 @@ public sealed class Controller : IDisposable
     private void UpdateLiveVisibility()
     {
         _overlay.SetLiveShown(Settings.ShowLive);
-        if (Settings.ShowLive && _overlayVisible)
+        if (Settings.ShowLive && ShowOverlays)
         {
             if (!_live.IsVisible)
             {
@@ -762,7 +863,7 @@ public sealed class Controller : IDisposable
     {
         Log.Write("boss alert: " + alert.Text);
         _overlay.ShowBossBanner(alert.Text);
-        if (!_overlayVisible) _tray?.ShowBalloonTip(8000, "필드보스", alert.Text, Forms.ToolTipIcon.Info);
+        if (!ShowOverlays) _tray?.ShowBalloonTip(8000, "필드보스", alert.Text, Forms.ToolTipIcon.Info);
         if (!Settings.BossSound) return;
         BossSound.Play(alert.MinutesBefore <= 1 ? 2 : 1, Settings.BossVolume);   // the last-minute alert rings twice
     }

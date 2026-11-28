@@ -247,6 +247,7 @@
                                 — 설치 후 측정 시작을 누르세요.
                             </TextBlock>
                             <CheckBox x:Name="AutoStart" Content="실행하면 자동으로 측정 시작" Click="OnChanged" Margin="0,10,0,3" />
+                            <CheckBox x:Name="RunAtLogin" Content="컴퓨터를 켜면 자동으로 실행" Click="OnChanged" Margin="0,0,0,3" />
                             <!-- Packet collection is switched on in the "데이터 보내기" window; these stay for the code but are hidden -->
                             <CheckBox x:Name="Record" Content="원시 패킷 녹화 (문제 분석용, 다음 측정 시작부터)" Click="OnChanged" Visibility="Collapsed" />
                             <DockPanel Margin="24,2,0,0" Visibility="Collapsed">
@@ -275,7 +276,7 @@
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="목표 등수" Style="{StaticResource Section}" />
-                            <TextBlock Text="켜 둔 목표까지 남은 점수를 표시창 아래에 한 줄씩 보여 줍니다. 둘 다 꺼 두면 표시창은 지금과 똑같고, 하나라도 켜면 표시창 아래에 한 칸이 늘어납니다. 게임의 랭킹 창을 열었을 때 받은 상위 500위 목록의 점수와 내 현재 포인트를 비교하므로, 랭킹 창(ALL과 내 직업 탭)을 한 번씩 열어 두어야 합니다." Style="{StaticResource Note}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                            <TextBlock Text="켜 둔 목표까지 남은 점수를 표시창 아래에 보여 줍니다. 둘 다 끄면 표시창은 그대로입니다. 게임의 랭킹 창(ALL과 내 직업 탭)을 한 번씩 열어 두어야 합니다." Style="{StaticResource Note}" TextWrapping="Wrap" Margin="0,0,0,4" />
                             <DockPanel Margin="0,6,0,0">
                                 <TextBlock Text="위" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="4,0,0,0" />
                                 <TextBox x:Name="GoalAllRank" DockPanel.Dock="Right" Width="64" Padding="4,2" HorizontalContentAlignment="Right" MaxLength="5"
@@ -294,7 +295,15 @@
                         <StackPanel>
                             <TextBlock Text="창 위치" Style="{StaticResource Section}" />
                             <CheckBox x:Name="AlwaysOnTop" Content="항상 맨 위에 표시" Click="OnChanged" />
-                            <TextBlock Text="표시창, 처치 명단, 실시간 전투, 자세히 보기 창이 다른 창 위에 항상 보입니다. 끄면 일반 창처럼 다른 창에 가려질 수 있습니다 (게임을 전체 화면으로 쓰면 가려져서 보이지 않을 수 있으니 '테두리 없는 창' 모드를 권장합니다)." Style="{StaticResource Note}" TextWrapping="Wrap" Margin="24,0,0,0" />
+                            <CheckBox x:Name="OnlyWithGame" Content="게임 창이 맨 앞일 때만 표시" Click="OnChanged" Margin="0,4,0,0" />
+                            <TextBlock Text="표시창, 처치 명단, 실시간 전투, 자세히 보기 창이 항상 다른 창 위에 보입니다. 게임은 '테두리 없는 창'으로 쓰세요." Style="{StaticResource Note}" TextWrapping="Wrap" Margin="24,0,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="성능 모드" Style="{StaticResource Section}" />
+                            <CheckBox x:Name="FullMode" Content="성능 모드 (갱신을 빠르게)" Click="OnChanged" />
+                            <TextBlock Text="기본은 가볍게 동작합니다(우선순위 낮춤, 창 초당 2번 갱신, 실시간 전투 5명). 켜면 창을 초당 10번 갱신하고 줄 수를 설정대로 보여줍니다. 렉이 없을 때만 켜세요." Style="{StaticResource Note}" TextWrapping="Wrap" Margin="24,0,0,0" />
                         </StackPanel>
                     </Border>
                     <!-- Overlay -->
@@ -393,7 +402,7 @@
                                 <Slider x:Name="TargetVolumeSlider" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center" ValueChanged="OnTargetVolume" PreviewMouseLeftButtonUp="OnTargetVolumeDone" />
                             </DockPanel>
-                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="상대가 시야에 들어올 때 직업을 알아 두었다가, 그 상대를 조준하는 순간 알립니다. 앱을 켜기 전부터 보이던 상대는 직업을 몰라서 알리지 않습니다. 게임에 아무것도 보내지 않고 화면의 정보만 읽습니다." />
+                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="상대를 조준하는 순간 알립니다. 앱을 켜기 전부터 보이던 상대는 직업을 몰라서 알리지 않습니다." />
                             <Button Content="알림음 듣기" Click="OnTargetTest" HorizontalAlignment="Left" Margin="0,8,0,0" />
                         </StackPanel>
                     </Border>
@@ -417,7 +426,7 @@
                                 <Slider x:Name="BossVolumeSlider" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center" ValueChanged="OnBossVolume" PreviewMouseLeftButtonUp="OnBossVolumeDone" />
                             </DockPanel>
-                            <TextBlock Style="{StaticResource Note}" Text="알림은 메인 표시창 위쪽에 5초 동안 뜨고(누르면 바로 닫힙니다) 앱의 알림 소리가 납니다. 1분 전 알림은 소리가 두 번 납니다. 표시창을 숨겨 두면 트레이 알림으로 나옵니다." />
+                            <TextBlock Style="{StaticResource Note}" Text="알림은 표시창 위에 5초간 뜨고 소리가 납니다(1분 전은 두 번). 표시창을 숨기면 트레이 알림으로 나옵니다." />
                             <Button Content="알림 시험" Click="OnBossTest" HorizontalAlignment="Left" Margin="0,8,0,0" />
                         </StackPanel>
                     </Border>
@@ -444,7 +453,7 @@
                                 <Slider x:Name="DebuffVolumeSlider" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center" ValueChanged="OnDebuffVolume" PreviewMouseLeftButtonUp="OnDebuffVolumeDone" />
                             </DockPanel>
-                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="적(다른 종족 플레이어나 몬스터)이 나에게 거는 디버프 중 스킬 이름으로 고른 것이 걸리는 순간 한 번 알립니다. 무슨 효과인지는 상관없이 이름만 봅니다 (한 스킬이 기절과 치유량 감소를 같이 걸어도 한 번만 울립니다). 지속 피해 디버프(고통의 연쇄 등)는 계속되는 피해마다 울리지 않고, 풀렸다가 다시 걸리면 다시 알립니다. 목록에는 알려진 디버프와, 나에게 걸린 적이 있는 디버프가 자동으로 추가됩니다. 장판(불의 장벽, 냉기 폭풍)과 아군의 효과는 알리지 않습니다." />
+                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="적이 나에게 거는 디버프 중 고른 것이 걸리는 순간 한 번 알립니다. 효과가 아니라 스킬 이름으로 고르며, 지속 피해는 풀렸다 다시 걸릴 때만 다시 알립니다. 장판과 아군 효과는 알리지 않습니다." />
                             <Button Content="알림음 듣기" Click="OnDebuffTest" HorizontalAlignment="Left" Margin="0,8,0,0" />
                         </StackPanel>
                     </Border>
@@ -461,7 +470,7 @@
                                 <Slider x:Name="TargetDebuffVolumeSlider" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center" ValueChanged="OnTargetDebuffVolume" PreviewMouseLeftButtonUp="OnTargetDebuffVolumeDone" />
                             </DockPanel>
-                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="내가 조준한 상대에게 내가 건 디버프나 아군이 건 디버프가 걸리는 순간 한 번 알립니다 (아군을 조준했을 때는 적이 건 디버프). 나에게 걸리는 디버프와 목록과 소리 크기를 따로 정하고, 소리도 다릅니다 (위는 띵동, 이쪽은 올라가는 띠링). 한 스킬이 효과를 여러 개 걸어도 한 번만 울립니다." />
+                            <TextBlock Style="{StaticResource Note}" TextWrapping="Wrap" Text="내가 조준한 상대에게 걸리는 디버프를 알립니다(아군을 조준하면 적이 건 것). 나에게 걸리는 디버프와 목록·소리 크기를 따로 정하고, 소리도 다릅니다." />
                             <Button Content="알림음 듣기" Click="OnTargetDebuffTest" HorizontalAlignment="Left" Margin="0,8,0,0" />
                         </StackPanel>
                     </Border>
@@ -488,9 +497,9 @@
                             <TextBlock Text="구간 기록 보내기" Style="{StaticResource Section}" />
                             <CheckBox x:Name="UploadWindows" Content="내 구간 기록을 서버로 보내는 데 동의합니다" Click="OnUploadWindows" />
                             <TextBlock Style="{StaticResource Note}"
-                                       Text="랭킹 초기화 시각 기준으로 한 시간이 끝날 때마다 포인트 변화(시작·끝 총 포인트, 획득·손실, 파티 인원별 합계)와 처치·사망 기록(시각, 종류, 포인트, 상대의 서버)을 내 캐릭터 이름·서버와 함께 보냅니다. 상대 이름은 보내지 않고 이 PC에만 남습니다. 변화가 없던 구간은 보내지 않습니다." />
+                                       Text="한 시간(랭킹 초기화 시각 기준)이 끝날 때마다 포인트 변화와 처치·사망 기록(시각, 종류, 포인트, 상대의 서버)을 내 캐릭터 이름·서버와 함께 보냅니다. 상대 이름은 보내지 않습니다. 변화가 없던 구간은 보내지 않습니다." />
                             <TextBlock Style="{StaticResource Note}"
-                                       Text="서버의 기록은 보낸 이 설치(앱)만 읽을 수 있고, 캐릭터 이름과 서버만으로는 조회되지 않습니다. 나중에 랭킹이나 웹사이트에 보여 주게 되면 그 전에 다시 알리고 동의를 받습니다. 동의하지 않아도 다른 기능은 그대로 쓸 수 있고, 언제든 끄고 보낸 기록을 지울 수 있습니다." />
+                                       Text="서버의 기록은 보낸 앱만 읽을 수 있습니다. 웹사이트 등에 보여 주게 되면 그 전에 다시 알리고 동의를 받습니다. 동의하지 않아도 다른 기능은 그대로 쓰고, 언제든 끄고 보낸 기록을 지울 수 있습니다." />
                             <TextBlock Style="{StaticResource Note}">
                                 <Hyperlink Click="OnHelpWindows">자세한 설명 (사용 설명서)</Hyperlink>
                                  · <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/PRIVACY.md" RequestNavigate="OnLink">개인정보 처리방침</Hyperlink> · <Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/TERMS.md" RequestNavigate="OnLink">이용 안내</Hyperlink>
@@ -509,14 +518,14 @@
                         <StackPanel>
                             <TextBlock Text="내 PC의 기록 보관" Style="{StaticResource Section}" />
                             <TextBlock Style="{StaticResource Note}" Margin="0,0,0,6"
-                                       Text="내 기록 창에 보이는 구간 기록과 처치·사망(상대 이름, 피해 상세)은 이 PC에 저장됩니다. 서버에는 최근 7일치만 있고, 이 PC의 기록은 아래에서 고른 기간 동안 남습니다." />
+                                       Text="구간 기록과 처치·사망(상대 이름, 피해 상세)은 이 PC에 저장됩니다. 서버에는 최근 7일치만 있습니다." />
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="Keep7" GroupName="Keep" Content="7일" Margin="0,0,16,0" Click="OnKeepDays" />
                                 <RadioButton x:Name="Keep30" GroupName="Keep" Content="30일" Margin="0,0,16,0" Click="OnKeepDays" />
                                 <RadioButton x:Name="KeepForever" GroupName="Keep" Content="계속 (기본)" Click="OnKeepDays" />
                             </StackPanel>
                             <TextBlock Style="{StaticResource Note}"
-                                       Text="7일이나 30일을 고르면 그 기간이 지난 처치 기록과 구간 사본(상대 이름 포함)을 지웁니다. 계속 보관해도 처치 기록이 15만 건을 넘으면 오래된 것부터 지웁니다. 포인트 합계 기록에는 이름이 없습니다." />
+                                       Text="7일·30일을 고르면 그 기간이 지난 처치 기록과 구간 사본을 지웁니다. 계속 보관해도 처치 기록이 15만 건을 넘으면 오래된 것부터 지웁니다." />
                         </StackPanel>
                     </Border>
 

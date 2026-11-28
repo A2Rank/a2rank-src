@@ -16,7 +16,7 @@ public sealed class PcapWriter : IDisposable
     public PcapWriter(string path, int linkType)
     {
         LinkType = linkType;
-        _stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+        _stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 64 * 1024);   // (a big buffer: two small writes per packet were two calls to the system)
         var h = new byte[24];
         BinaryPrimitives.WriteUInt32LittleEndian(h, 0xA1B2C3D4);
         BinaryPrimitives.WriteUInt16LittleEndian(h.AsSpan(4), 2);

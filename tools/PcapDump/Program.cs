@@ -106,6 +106,16 @@ if (args.Length >= 1 && args[0] == "--find-totals")
     TotalSearch.Run(args.Skip(1), Console.Out);
     return 0;
 }
+if (args.Length >= 2 && args[0] == "--bench")
+{
+    Bench.Run(args[1], Console.Out);
+    return 0;
+}
+if (args.Length >= 2 && args[0] == "--effects")
+{
+    EffectScan.Run(args.Skip(1), Console.Out);
+    return 0;
+}
 if (args.Length >= 1 && args[0] == "--identities")
 {
     Identities.Run(args.Skip(1), Console.Out);

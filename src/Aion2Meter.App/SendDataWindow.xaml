@@ -103,7 +103,7 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="16,2,8,4" Padding="0,0,8,0">
                 <StackPanel>
                     <TextBlock TextWrapping="Wrap" Foreground="{StaticResource FaintBrush}" FontSize="11.5" Margin="0,0,0,10"
-                               Text="받은 패킷과 인게임 전투 분석기 캡처를 맞춰 보고, 아직 이름을 모르는 스킬을 알아내는 데 씁니다. 보내 주신 만큼 스킬 이름이 정확해집니다." />
+                               Text="받은 패킷과 인게임 전투 분석기 캡처를 맞춰 보고, 아직 이름을 모르는 스킬을 알아내는 데 씁니다." />
 
                     <!-- 1. Consent -->
                     <Border Style="{StaticResource Card}">
@@ -111,7 +111,7 @@
                             <TextBlock Text="1. 인게임 패킷 수집" Style="{StaticResource Section}" />
                             <CheckBox x:Name="Consent" Content="인게임 패킷 수집에 동의합니다" Click="OnConsent" />
                             <TextBlock Style="{StaticResource Note}"
-                                       Text="동의하면 다음 측정을 시작할 때부터, 전투가 시작되면 그 순간의 1분 전부터 마지막 전투 5분 뒤까지의 패킷이 전투마다 파일 하나로 이 PC에 저장됩니다(전투가 없으면 저장하지 않고, 자동으로 보내지지 않습니다). 패킷에는 캐릭터 이름과 전투 내용이 들어 있습니다. 비밀번호와 결제 정보는 이 게임의 패킷에 들어 있지 않습니다. 보내기를 누르면 최근 1시간의 녹화(없으면 최근 3개)가 캡처와 함께 올라가며, 어떤 파일이 올라가는지는 아래에 보여 드립니다. 이 PC의 녹화는 합쳐서 300 MB까지만 보관하고, 넘으면 오래된 것부터 자동으로 지웁니다. 동의를 끄면 수집을 멈춥니다." />
+                                       Text="동의하면 다음 측정부터, 전투마다 패킷(전투 1분 전~마지막 전투 5분 뒤)이 파일 하나로 이 PC에 저장됩니다. 자동으로 보내지지 않습니다. 패킷에는 캐릭터 이름과 전투 내용이 들어 있고, 비밀번호와 결제 정보는 없습니다. 보낼 때 올라가는 파일은 아래에 보여 드립니다. 녹화는 300 MB까지만 보관하고 넘으면 오래된 것부터 지웁니다. 녹화하는 동안 PC 사양에 따라 렉이 생길 수 있습니다. 동의를 끄면 수집을 멈춥니다." />
                             <TextBlock x:Name="ConsentState" Style="{StaticResource Note}" Foreground="{StaticResource AccentBrush}" />
                             <TextBlock Style="{StaticResource Note}"><Hyperlink NavigateUri="https://github.com/A2Rank/releases/blob/main/PRIVACY.md" RequestNavigate="OnLink">개인정보 처리방침</Hyperlink> (보내는 정보, 보관 기간, 삭제 요청 방법)</TextBlock>
                         </StackPanel>
@@ -122,9 +122,9 @@
                         <StackPanel>
                             <TextBlock Text="2. 함께 보낼 패킷 녹화 (자동)" Style="{StaticResource Section}" />
                             <TextBlock Style="{StaticResource Note}" Margin="0,0,0,4"
-                                       Text="고르실 필요 없습니다. 보내기를 누르면 최근 1시간의 녹화(방금 전투까지, 없으면 최근 3개)가 자동으로 함께 올라가고, 캡처와 어느 녹화가 맞는지는 저희가 찾습니다." />
+                                       Text="고르실 필요 없습니다. 보내기를 누르면 최근 1시간의 녹화(없으면 최근 3개)가 자동으로 함께 올라갑니다." />
                             <TextBlock x:Name="RecordingsEmpty" Style="{StaticResource Note}" Margin="0"
-                                       Text="아직 녹화가 없습니다. 동의한 뒤 측정을 시작하고 전투한 다음 다시 열어 주세요 (전투가 시작되면 녹화가 만들어집니다)." />
+                                       Text="아직 녹화가 없습니다. 동의하고 측정을 켠 뒤 전투하고 다시 열어 주세요." />
                             <StackPanel x:Name="RecordingRows" />
                         </StackPanel>
                     </Border>
@@ -137,18 +137,18 @@
                                 <StackPanel>
                                     <TextBlock Text="캡처 방법 (꼭 확인해 주세요)" FontWeight="SemiBold" FontSize="11.5" Foreground="{StaticResource AccentBrush}" />
                                     <TextBlock TextWrapping="Wrap" FontSize="11.5" Margin="0,3,0,0" LineHeight="17"
-                                               Text="측정을 켠 채로 허수아비를 치고, 전투 분석기의 스킬별 표(스킬 이름, 타격 수, 총 피해량)를 캡처해 주세요. 표의 숫자와 패킷을 맞춰 스킬 이름을 확정합니다." />
+                                               Text="허수아비를 치고, 전투 분석기의 스킬별 표(스킬 이름, 타격 수, 총 피해량)를 캡처해 주세요." />
                                     <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0" Foreground="{StaticResource FaintBrush}"
-                                               Text="· 허수아비를 한 번만 치고(30초~1분), 그 한 번의 전투가 분석기에 담긴 상태에서 캡처해 주세요. 쓸 수 있는 스킬을 가능한 한 많이 한 번 이상씩 써 주세요.&#10;· 표의 모든 행이 보이게 캡처해 주세요. 한 장에 다 안 들어가면 위아래로 이어서 여러 장 찍어 주세요.&#10;· 패킷 녹화와 같은 시간대의 전투여야 합니다. 전투가 끝나고 캡처할 때까지 측정을 멈추지 말아 주세요." />
+                                               Text="· 허수아비를 한 번만 치고(30초~1분), 그 전투가 분석기에 담긴 상태에서 캡처해 주세요. 쓸 수 있는 스킬을 가능한 한 많이 써 주세요.&#10;· 표의 모든 행이 보이게 캡처해 주세요(한 장에 안 들어가면 여러 장으로).&#10;· 전투가 끝나고 캡처할 때까지 측정을 멈추지 말아 주세요." />
                                     <Button x:Name="ExampleButton" Content="예시 사진 보기" Click="OnExample" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,3" />
                                     <StackPanel x:Name="ExamplePanel" Visibility="Collapsed" Margin="0,8,0,0">
                                         <Image Source="help-analyzer.png" Width="400" HorizontalAlignment="Left" Stretch="Uniform" />
                                         <TextBlock Style="{StaticResource Note}"
-                                                   Text="이런 스킬별 표입니다: 스킬 이름, 타격 수(HIT), 총 피해량이 보이면 됩니다. 스킬 이름을 맞추는 분석에만 쓰고, 분석은 AI가 합니다." />
+                                                   Text="이런 표입니다: 스킬 이름, 타격 수(HIT), 총 피해량이 보이면 됩니다. 스킬 이름 분석에만 씁니다." />
                                         <TextBlock Text="전투 로그 (채팅창)" FontWeight="SemiBold" FontSize="11.5" Margin="0,12,0,4" />
                                         <Image Source="help-combatlog.png" Width="300" HorizontalAlignment="Left" Stretch="Uniform" />
                                         <TextBlock Style="{StaticResource Note}"
-                                                   Text="회복이나 효과 이름이 궁금한 스킬은 이런 전투 로그도 좋습니다. 시각(00:36)과 스킬 이름, 숫자가 보이게 캡처해 주세요. 캐릭터 이름이 보여도 괜찮습니다 (분석은 AI가 합니다)." />
+                                                   Text="이름이 궁금한 스킬의 전투 로그도 좋습니다. 시각(00:36)과 스킬 이름, 숫자가 보이게 캡처해 주세요." />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -157,7 +157,7 @@
                                 <Button Content="이미지 추가…" Click="OnAddImages" Margin="6,0,0,0" />
                             </StackPanel>
                             <TextBlock Style="{StaticResource Note}"
-                                       Text="캡처한 뒤 이 창에서 Ctrl+V를 누르면 바로 추가됩니다 (Win+Shift+S 캡처 등). 이미지 파일을 끌어다 놓아도 됩니다." />
+                                       Text="캡처 후 이 창에서 Ctrl+V로 추가합니다(Win+Shift+S 등). 이미지 파일을 끌어다 놓아도 됩니다." />
                             <StackPanel x:Name="ImageRows" Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>

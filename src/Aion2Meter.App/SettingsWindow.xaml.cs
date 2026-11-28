@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         var s = controller.Settings;
         AutoStart.IsChecked = s.AutoStart;
+        RunAtLogin.IsChecked = s.RunAtLogin;
         AutoUpdate.IsChecked = s.AutoUpdate;
         Record.IsChecked = s.RecordPackets;
         Keep7.IsChecked = s.NameKeepDays == 7;
@@ -30,6 +31,8 @@ public partial class SettingsWindow : Window
         ShowKillList.IsChecked = s.ShowKillList;
         DockKillList.IsChecked = s.KillListDocked;
         AlwaysOnTop.IsChecked = s.AlwaysOnTop;
+        OnlyWithGame.IsChecked = s.OnlyWithGame;
+        FullMode.IsChecked = !s.LightMode;
         ShowAllGoal.IsChecked = s.ShowAllGoal;
         ShowClassGoal.IsChecked = s.ShowClassGoal;
         GoalAllRank.Text = s.GoalAllRank.ToString();
@@ -541,10 +544,13 @@ public partial class SettingsWindow : Window
         if (_loading) return;
         var s = _controller.Settings;
         s.AutoStart = AutoStart.IsChecked == true;
+        s.RunAtLogin = RunAtLogin.IsChecked == true;
         s.AutoUpdate = AutoUpdate.IsChecked == true;
         s.RecordPackets = Record.IsChecked == true;
         s.ShowKillList = ShowKillList.IsChecked == true;
         s.AlwaysOnTop = AlwaysOnTop.IsChecked == true;
+        s.OnlyWithGame = OnlyWithGame.IsChecked == true;
+        s.LightMode = FullMode.IsChecked != true;
         (s.ShowAllGoal, s.ShowClassGoal) = (ShowAllGoal.IsChecked == true, ShowClassGoal.IsChecked == true);
         GoalAllRank.IsEnabled = s.ShowAllGoal;
         GoalClassRank.IsEnabled = s.ShowClassGoal;

@@ -19,6 +19,21 @@ internal static partial class Native
     private static partial nint SetWindowLongPtr(nint hwnd, int index, nint value);
 
     [LibraryImport("user32.dll")]
+    private static partial nint GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    private static partial uint GetWindowThreadProcessId(nint hwnd, out uint processId);
+
+    /// <summary>The process id of the window the user is working in now (0: none).</summary>
+    public static uint ForegroundProcess()
+    {
+        var hwnd = GetForegroundWindow();
+        if (hwnd == 0) return 0;
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        return pid;
+    }
+
+    [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool RegisterHotKey(nint hwnd, int id, uint modifiers, uint key);
 

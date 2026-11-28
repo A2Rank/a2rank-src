@@ -12,6 +12,15 @@ public partial class App : Application
         base.OnStartup(e);
         Paths.MigrateFromOldName();
         // (development with another data folder, A2RANK_DATA: may run beside the real one)
+        string suffix = Environment.GetEnvironmentVariable("A2RANK_DATA") is { Length: > 0 } ? "-dev" : "";
+        // "A2Rank.exe --quit" asks the running one to close the normal way (the period in progress is saved), for restarting it from a script.
+        if (e.Args.Contains("--quit"))
+        {
+            try { if (EventWaitHandle.TryOpenExisting(@"Local\A2Rank-quit" + suffix, out var running)) running.Set(); }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException) { }
+            Shutdown();
+            return;
+        }
         _single = new Mutex(true, Environment.GetEnvironmentVariable("A2RANK_DATA") is { Length: > 0 } ? @"Local\A2Rank-dev" : @"Local\A2Rank", out bool first);
         if (!first)
         {
@@ -37,8 +46,11 @@ public partial class App : Application
             _controller.SettingsChanged();
         }
         _controller.Run();
+        var quit = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\A2Rank-quit" + suffix);
+        new Thread(() => { quit.WaitOne(); Dispatcher.Invoke(() => _controller?.Exit()); }) { IsBackground = true }.Start();
         if (e.Args.Contains("--settings")) _controller.ShowSettings();
         if (e.Args.Contains("--preview-kills")) _controller.PreviewKills = SampleKills();
+        if (Array.IndexOf(e.Args, "--stress") is >= 0 and var st && st + 1 < e.Args.Length) _controller.StressRecording(e.Args[st + 1], st + 2 < e.Args.Length && double.TryParse(e.Args[st + 2], out var speed) ? speed : 1);
         if (Array.IndexOf(e.Args, "--preview-replay") is >= 0 and var at && at + 1 < e.Args.Length) _controller.ReplayRecording(e.Args[at + 1], Array.IndexOf(e.Args, "--preview-until") is >= 0 and var un && un + 1 < e.Args.Length ? TimeSpan.Parse(e.Args[un + 1]) : null);
         if (Array.IndexOf(e.Args, "--preview-character") is >= 0 and var pc && pc + 2 < e.Args.Length && int.TryParse(e.Args[pc + 2], out var pcServer)) CharacterInfoWindow.Show(e.Args[pc + 1], pcServer, null);   // development: the character page of a name and server code
         if (e.Args.Contains("--update-now")) _ = _controller.UpdateNow();

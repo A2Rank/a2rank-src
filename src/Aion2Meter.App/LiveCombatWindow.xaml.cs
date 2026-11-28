@@ -30,6 +30,12 @@ public partial class LiveCombatWindow : Window
     private bool _pressing, _dragging;
     private long _shownAt;
 
+    /// <summary>The board is redrawn at most every 500 ms: false while it is too soon (the caller need not work out the board then).</summary>
+    public bool Due => Environment.TickCount64 - _shownAt >= Gap;
+
+    /// <summary>Milliseconds between two redraws of the board.</summary>
+    public int Gap { get; set; } = 500;
+
     public LiveCombatWindow()
     {
         InitializeComponent();
@@ -155,7 +161,7 @@ public partial class LiveCombatWindow : Window
     public void Display(IReadOnlyList<DamageLedger.LiveOpponent> board, LiveSort sort, int maxRows, bool force = false)
     {
         long now = Environment.TickCount64;
-        if (!force && now - _shownAt < 500) return;
+        if (!force && now - _shownAt < Gap) return;
         _shownAt = now;
 
         var ordered = sort == LiveSort.Total ? board : [.. board.OrderByDescending(o => Key(o, sort)).ThenBy(o => o.Entity)];
