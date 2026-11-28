@@ -306,8 +306,47 @@ public sealed class MeterSession
         }
     }
 
+    // ---- the goal rank: the scores of the lists the game sent, top 500 of ALL and of each class, per race (kept for the next start)
+    private const string RankListKeyPrefix = "ranklist:";
+    private readonly Dictionary<(int Race, int Filter), RankList> _lists = [];
+
+    private RankList? ListOf(int race, int filter)
+    {
+        if (_lists.TryGetValue((race, filter), out var kept)) return kept;
+        var loaded = RankList.Decode(_store.Get($"{RankListKeyPrefix}{race}:{filter}"));
+        if (loaded is not null) _lists[(race, filter)] = loaded;
+        return loaded;
+    }
+
+    /// <summary>Keeps the scores of a list (the lists of the other classes too: which one is mine is only known from my own row).</summary>
+    private void RememberList(RankingMessage m)
+    {
+        if (!m.IsList || m.Entries.Count == 0) return;
+        int race = m.Entries[0].Race;
+        var scores = new Dictionary<int, long>();
+        foreach (var e in m.Entries)
+            if (e.Score <= long.MaxValue) scores[(int)e.Rank] = (long)e.Score;
+        var list = new RankList(m.Deadline - BucketBook.Length, scores);
+        if (_lists.TryGetValue((race, m.Filter), out var old) && old.AsOf > list.AsOf) return;   // an older list does not replace a newer one
+        _lists[(race, m.Filter)] = list;
+        _store.Set($"{RankListKeyPrefix}{race}:{m.Filter}", list.Encode());
+        Changed?.Invoke();
+    }
+
+    /// <summary>How far I am from <paramref name="target"/> in ALL (<paramref name="allBoard"/>) or in my class; null when there is no goal (target below 1).</summary>
+    public RankGoal? Goal(bool allBoard, int target)
+    {
+        if (target < 1) return null;
+        int race = Matcher.MyRace() ?? (Character is null ? 0 : Servers.RaceOf(Character.Server));
+        if (race == 0) return new RankGoal(target, GoalState.NoList, null, null, 0, null);
+        if (!allBoard && Rank?.ClassFilter is not int filter) return new RankGoal(target, GoalState.NoClass, null, null, 0, null);
+        int board = allBoard ? 0 : Rank!.ClassFilter!.Value;
+        return RankGoals.Evaluate(ListOf(race, board), Points.Total, allBoard ? Rank?.AllRank : Rank?.ClassRank, target);
+    }
+
     private void OnRanking(RankingMessage m, DateTimeOffset time)
     {
+        RememberList(m);
         if (!m.IsList && m.Filter == 0 && m.Entries.Count > 0)
         {
             var me = m.Entries[0];

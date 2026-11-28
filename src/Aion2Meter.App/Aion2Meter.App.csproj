@@ -15,7 +15,7 @@
     <!-- Only for the tray icon (NotifyIcon); WPF has none. -->
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>A2Rank</AssemblyName>
-    <Version>0.2.28</Version>
+    <Version>0.2.29</Version>
     <StartupObject>Aion2Meter.App.Program</StartupObject>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

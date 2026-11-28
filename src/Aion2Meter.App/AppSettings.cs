@@ -38,6 +38,11 @@ public sealed class AppSettings
     public bool ShowKillList { get; set; } = true;
     /// <summary>The overlay, the kill list, the live fight window and the detail windows stay above all other windows (off: they are ordinary windows that other windows, also the game, can cover).</summary>
     public bool AlwaysOnTop { get; set; } = true;
+    /// <summary>The main window also shows how many points are left to a goal rank, in ALL and/or in my class (each on its own; both off: the main window is as it was).</summary>
+    public bool ShowAllGoal { get; set; }
+    public int GoalAllRank { get; set; } = 100;
+    public bool ShowClassGoal { get; set; }
+    public int GoalClassRank { get; set; } = 10;
     /// <summary>Where the character info window was last (it opens there again; null: not yet).</summary>
     public double? CharInfoLeft { get; set; }
     public double? CharInfoTop { get; set; }

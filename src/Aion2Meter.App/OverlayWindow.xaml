@@ -82,6 +82,16 @@
                 </Border>
             </UniformGrid>
 
+            <!-- Goal rank: only when it is switched on in the settings -->
+            <Border x:Name="GoalPanel" Visibility="Collapsed" Background="{StaticResource TileBrush}" CornerRadius="6" Padding="8,5" Margin="0,5,1,0">
+                <StackPanel>
+                    <TextBlock Text="목표 등수까지" Style="{StaticResource Caption}" />
+                    <TextBlock x:Name="GoalAll" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="GoalClass" FontSize="11.5" FontWeight="SemiBold" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="GoalNote" Style="{StaticResource Caption}" FontSize="9.5" Margin="0,3,0,0" />
+                </StackPanel>
+            </Border>
+
             <!-- Footer -->
             <DockPanel Margin="0,7,0,0">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">

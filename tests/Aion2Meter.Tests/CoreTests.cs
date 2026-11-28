@@ -338,3 +338,88 @@ public class CoreTests
     }
 }
 
+
+/// <summary>The goal rank: points still needed to pass the one at that rank, from the lists the game sends (the top 500).</summary>
+public class RankGoalTests
+{
+    private static readonly StreamToken Token = new(new FlowKey("10.0.0.1", 13328, "192.168.0.2", 50001), 0);
+    private static readonly DateTimeOffset T0 = new(2026, 11, 25, 12, 0, 0, Kst.Offset);
+    private static MessageEvent Msg(GameMessage m, double seconds) => new(Token, T0.AddSeconds(seconds), m);
+    private static readonly DateTimeOffset Deadline = T0.AddMinutes(40);
+
+    private static RankingEntry Row(uint rank, ulong id, string name, ulong score, int cls = 8) => new(rank, 1006, id, name, "", 1, 55, cls, score);
+
+    // a list of the top 500: the score of rank n is 20,000,000 - 10,000 n
+    private static RankingMessage List(int filter, params RankingEntry[] replace) => new(true, filter,
+        Enumerable.Range(1, 500).Where(n => replace.All(r => r.Rank != n)).Select(n => Row((uint)n, (ulong)(1000 + n), $"상대{n}", 20_000_000UL - 10_000UL * (ulong)n))
+            .Concat(replace).OrderBy(e => e.Rank).ToList(), Deadline, 10_000);
+
+    [Fact]
+    public void Points_to_the_goal_rank_from_the_list_and_my_live_total()
+    {
+        using var store = new MeterStore(":memory:");
+        var s = new MeterSession(store, ResetMode.OnTheHour, 3, T0);
+        s.Start(T0);
+        s.Handle(Msg(new EnterWorldMessage(13313, "아라", 1019, 18_500_000), 1));
+        Assert.Equal(GoalState.NoList, s.Goal(true, 100)!.State);            // the ranking window was not opened yet
+        Assert.Null(s.Goal(true, 0));                                          // no goal
+        s.Handle(Msg(List(0), 2));
+        var goal = s.Goal(true, 100)!;
+        Assert.Equal((GoalState.Needed, 19_000_000L, 500_001L), (goal.State, goal.ScoreAtTarget, goal.Needed));
+        Assert.Equal(Deadline - BucketBook.Length, goal.AsOf);
+        // I gain points: the goal comes closer with my live total
+        s.Handle(Msg(new PointMessage(18_800_000), 10));
+        Assert.Equal(200_001L, s.Goal(true, 100)!.Needed);
+        // past the one at the goal rank: reached, with the lead
+        s.Handle(Msg(new PointMessage(19_050_000), 20));
+        var reached = s.Goal(true, 100)!;
+        Assert.Equal((GoalState.Reached, 50_000L), (reached.State, reached.Needed));
+    }
+
+    [Fact]
+    public void A_goal_below_the_last_rank_of_the_list_knows_only_the_last_rank()
+    {
+        using var store = new MeterStore(":memory:");
+        var s = new MeterSession(store, ResetMode.OnTheHour, 3, T0);
+        s.Start(T0);
+        s.Handle(Msg(new EnterWorldMessage(13313, "아라", 1019, 14_000_000), 1));
+        s.Handle(Msg(List(0), 2));                                              // the 500th has 15,000,000
+        var beyond = s.Goal(true, 800)!;
+        Assert.Equal((GoalState.Beyond, 15_000_000L, 1_000_001L, 500), (beyond.State, beyond.ScoreAtTarget, beyond.Needed, beyond.ListLastRank));
+        s.Handle(Msg(new PointMessage(15_500_000), 10));                        // above the 500th: inside whatever the goal below it is
+        var inside = s.Goal(true, 800)!;
+        Assert.Equal((GoalState.Reached, 500_000L), (inside.State, inside.Needed));
+    }
+
+    [Fact]
+    public void The_class_goal_needs_my_class_list_and_the_lists_survive_a_restart()
+    {
+        using var store = new MeterStore(":memory:");
+        var s = new MeterSession(store, ResetMode.OnTheHour, 3, T0);
+        s.Start(T0);
+        s.Handle(Msg(new EnterWorldMessage(13313, "아라", 1019, 18_500_000), 1));
+        s.Handle(Msg(new RankingMessage(false, 0, [Row(167, 14417, "아라", 18_500_000)], Deadline, 10_000), 2));
+        Assert.Equal(GoalState.NoClass, s.Goal(false, 10)!.State);             // which class list is mine is not known yet
+        s.Handle(Msg(List(0), 3));
+        // my own row in the class list teaches which one is mine (rank 23 = my 18,500,000, so the 10th has 19,900,000)
+        s.Handle(Msg(List(8, Row(23, 14417, "아라", 18_500_000)), 4));
+        Assert.Equal(8, s.Rank!.ClassFilter);
+        var classGoal = s.Goal(false, 10)!;
+        Assert.Equal((GoalState.Needed, 19_900_000L, 1_400_001L), (classGoal.State, classGoal.ScoreAtTarget, classGoal.Needed));
+        // the lists were kept in the database
+        var restarted = new MeterSession(store, ResetMode.OnTheHour, 3, T0.AddMinutes(5));
+        restarted.Start(T0.AddMinutes(5));
+        restarted.Handle(Msg(new EnterWorldMessage(13313, "아라", 1019, 18_500_000), 301));
+        Assert.Equal((GoalState.Needed, 500_001L), (restarted.Goal(true, 100)!.State, restarted.Goal(true, 100)!.Needed));
+    }
+
+    [Fact]
+    public void A_tie_with_the_goal_counts_only_when_my_own_rank_is_inside()
+    {
+        var list = new RankList(T0, new Dictionary<int, long> { [1] = 100, [2] = 90, [3] = 80 });
+        Assert.Equal(GoalState.Needed, RankGoals.Evaluate(list, 90, 5, 2).State);          // 90 = the score of rank 2, but I am ranked 5: I have to pass them
+        Assert.Equal(GoalState.Reached, RankGoals.Evaluate(list, 90, 2, 2).State);         // I am the one at rank 2
+        Assert.Equal(GoalState.NoPoints, RankGoals.Evaluate(list, null, null, 2).State);
+        Assert.Equal(GoalState.NoList, RankGoals.Evaluate(null, 90, null, 2).State);
+    }
+}

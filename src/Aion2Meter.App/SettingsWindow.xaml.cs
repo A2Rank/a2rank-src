@@ -30,6 +30,12 @@ public partial class SettingsWindow : Window
         ShowKillList.IsChecked = s.ShowKillList;
         DockKillList.IsChecked = s.KillListDocked;
         AlwaysOnTop.IsChecked = s.AlwaysOnTop;
+        ShowAllGoal.IsChecked = s.ShowAllGoal;
+        ShowClassGoal.IsChecked = s.ShowClassGoal;
+        GoalAllRank.Text = s.GoalAllRank.ToString();
+        GoalClassRank.Text = s.GoalClassRank.ToString();
+        GoalAllRank.IsEnabled = s.ShowAllGoal;
+        GoalClassRank.IsEnabled = s.ShowClassGoal;
         ShowLive.IsChecked = s.ShowLive;
         LiveRowsText.Text = s.LiveRows.ToString();
         OpacitySlider.Value = Math.Round(s.PanelOpacity * 100);
@@ -151,6 +157,19 @@ public partial class SettingsWindow : Window
         foreach (var name in Pages)
             if (FindName(name) is StackPanel panel) panel.Visibility = name == page ? Visibility.Visible : Visibility.Collapsed;
         Scroll?.ScrollToTop();
+    }
+
+    /// <summary>Only digits can be typed into the goal rank boxes.</summary>
+    private void OnDigitsOnly(object sender, TextCompositionEventArgs e) => e.Handled = !e.Text.All(char.IsAsciiDigit);
+
+    /// <summary>A goal rank was typed (0 or empty: not shown); kept at once, up to 10,000.</summary>
+    private void OnGoalChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loading) return;
+        static int Rank(TextBox box) => int.TryParse(box.Text, out int n) ? Math.Clamp(n, 0, 10_000) : 0;
+        var s = _controller.Settings;
+        (s.GoalAllRank, s.GoalClassRank) = (Rank(GoalAllRank), Rank(GoalClassRank));
+        _controller.SettingsChanged();
     }
 
     private void OnBossChanged(object sender, RoutedEventArgs e)
@@ -526,6 +545,9 @@ public partial class SettingsWindow : Window
         s.RecordPackets = Record.IsChecked == true;
         s.ShowKillList = ShowKillList.IsChecked == true;
         s.AlwaysOnTop = AlwaysOnTop.IsChecked == true;
+        (s.ShowAllGoal, s.ShowClassGoal) = (ShowAllGoal.IsChecked == true, ShowClassGoal.IsChecked == true);
+        GoalAllRank.IsEnabled = s.ShowAllGoal;
+        GoalClassRank.IsEnabled = s.ShowClassGoal;
         s.KillListDocked = DockKillList.IsChecked == true;
         s.ShowLive = ShowLive.IsChecked == true;
         s.Hotkeys = Hotkeys.IsChecked == true;

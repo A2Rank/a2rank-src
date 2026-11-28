@@ -78,6 +78,43 @@ public partial class OverlayWindow : Window
     }
 
     /// <param name="statusBrush">Resource key of the status dot color.</param>
+    /// <summary>The goal rank lines (settings, "목표 등수"): points left to the goal in ALL and in my class, with the time of the list they are worked out from.</summary>
+    private void ShowGoals(MeterSession s)
+    {
+        var settings = _controller.Settings;
+        int allGoal = settings.ShowAllGoal ? settings.GoalAllRank : 0, classGoal = settings.ShowClassGoal ? settings.GoalClassRank : 0;
+        bool on = allGoal > 0 || classGoal > 0;
+        GoalPanel.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        if (!on) return;
+        DateTimeOffset? oldest = null;
+        (string Text, string Brush)? Line(string label, RankGoal? goal)
+        {
+            if (goal is null) return null;
+            if (goal.AsOf is DateTimeOffset at && (oldest is null || at < oldest)) oldest = at;
+            return goal.State switch
+            {
+                GoalState.Needed => ($"{label} {goal.Target:N0}위까지 {goal.Needed:N0}점", "AccentBrush"),
+                GoalState.Reached => ($"{label} {goal.Target:N0}위 달성 · {goal.Needed:N0}점 앞섬", "GainBrush"),
+                GoalState.Beyond => ($"{label} {goal.Target:N0}위: 목록은 {goal.ListLastRank:N0}위까지 ({goal.ListLastRank:N0}위까지 {goal.Needed:N0}점)", "FaintBrush"),
+                GoalState.NoClass => ($"{label} {goal.Target:N0}위: 게임 랭킹 창에서 직업 탭을 한 번 열어 주세요", "FaintBrush"),
+                GoalState.NoPoints => ($"{label} {goal.Target:N0}위: 총 포인트 수신 대기", "FaintBrush"),
+                _ => ($"{label} {goal.Target:N0}위: 게임에서 랭킹 창을 열면 표시됩니다", "FaintBrush"),
+            };
+        }
+        void Set(TextBlock block, (string Text, string Brush)? line)
+        {
+            block.Visibility = line is null ? Visibility.Collapsed : Visibility.Visible;
+            if (line is not { } l) return;
+            block.Text = l.Text;
+            block.Foreground = Brush(l.Brush);
+        }
+        Set(GoalAll, Line("ALL", s.Goal(true, allGoal)));
+        Set(GoalClass, Line("직업", s.Goal(false, classGoal)));
+        GoalNote.Text = oldest is DateTimeOffset when ? $"{Kst.Of(when):HH:mm} 랭킹 목록 기준" : "";
+        GoalNote.Visibility = GoalNote.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        GoalPanel.ToolTip = "게임의 랭킹 창에서 받은 상위 500위 목록의 점수와 내 현재 포인트를 비교한 값입니다.\n목록의 점수는 그 시각(매시 랭킹 갱신)의 총 포인트라서, 다른 사람들이 그 뒤에 올린 점수만큼 실제 차이는 더 커질 수 있습니다.";
+    }
+
     public void Display(MeterSession s, DateTimeOffset now, string status, string statusBrush)
     {
         CharacterText.Text = s.Character is { } c
@@ -119,6 +156,7 @@ public partial class OverlayWindow : Window
             ? $"총 {total:N0}점" + (s.Points.TotalIsLive ? "" : " · 마지막 확인값")
             : "총 포인트 수신 대기";
         Status.Text = status;
+        ShowGoals(s);
     }
 
     private Brush Brush(string key) => (Brush)FindResource(key);
